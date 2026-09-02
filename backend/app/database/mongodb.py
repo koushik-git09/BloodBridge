@@ -1,6 +1,8 @@
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.core.config import MONGODB_URL, DATABASE_NAME
 
-client = MongoClient(MONGODB_URL)
+
+client = AsyncIOMotorClient(MONGODB_URL)
 
 db = client[DATABASE_NAME]

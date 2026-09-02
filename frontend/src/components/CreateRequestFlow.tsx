@@ -5,7 +5,11 @@ import UrgencyBadge from './UrgencyBadge';
 
 interface Props {
   onClose: () => void;
-  onSubmit: (data: { bloodGroup: BloodGroup; units: number; urgency: Urgency }) => void;
+  onSubmit: (data: {
+  bloodGroup: BloodGroup;
+  unitsRequired: number;
+  urgency: Urgency;
+}) => void;
 }
 
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -35,7 +39,11 @@ export default function CreateRequestFlow({ onClose, onSubmit }: Props) {
       setProcessingStep(i);
       await new Promise(r => setTimeout(r, 900));
     }
-    onSubmit({ bloodGroup, units, urgency });
+    onSubmit({
+  bloodGroup,
+  unitsRequired: units,
+  urgency,
+});
   };
 
   const stepLabels = ['Patient Requirement', 'Verification', 'Location', 'Review'];
