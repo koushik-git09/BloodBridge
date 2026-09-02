@@ -17,7 +17,7 @@ type AvailabilityOption = {
   border: string;
   icon: string;
   desc: string;
-};
+}; 
 
 const availabilityOptions: AvailabilityOption[] = [
   { key: 'AVAILABLE', label: 'Available', color: '#00bfb3', bg: 'rgba(0,191,179,0.10)', border: 'rgba(0,191,179,0.35)', icon: '●', desc: 'Ready to respond to requests' },
