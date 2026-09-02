@@ -1,36 +1,43 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from typing import Literal
 
 from app.schemas.common import Location
 
 
 class RegisterRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
-    email: EmailStr
-    password: str = Field(..., min_length=6)
-    phone: str = Field(..., min_length=10, max_length=20)
 
-    role: Literal["HOSPITAL", "BLOOD_BANK", "DONOR"]
+    name: str
+
+    email: EmailStr
+
+    password: str
+
+    phone: str
+
+    role: Literal[
+        "HOSPITAL",
+        "BLOOD_BANK",
+        "DONOR"
+    ]
 
     location: Location
 
-    # Donor-specific fields
-    bloodGroup: Literal[
-        "A+", "A-",
-        "B+", "B-",
-        "AB+", "AB-",
-        "O+", "O-"
-    ] | None = None
+    # DONOR fields
+    bloodGroup: str | None = None
 
-    # Hospital-specific field
+    # HOSPITAL fields
     hospitalName: str | None = None
 
 
 class LoginRequest(BaseModel):
+
     email: EmailStr
+
     password: str
 
 
 class TokenResponse(BaseModel):
-    accessToken: str
-    tokenType: str = "bearer"
+
+    access_token: str
+
+    token_type: str = "bearer"

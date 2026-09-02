@@ -115,9 +115,9 @@ async def login_user(email: str, password: str):
     )
 
     return {
-        "accessToken": access_token,
-        "tokenType": "bearer",
-    }
+    "access_token": access_token,
+    "token_type": "bearer",
+}
 
 
 async def get_user_by_id(user_id: str):

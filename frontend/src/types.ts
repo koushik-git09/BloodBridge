@@ -8,10 +8,20 @@ export type RequestStatus =
   | 'DONOR_MATCHING'
   | 'FULFILLED'
   | 'CONFIRMED';
-export type Role = 'HOSPITAL' | 'BLOOD_BANK' | 'DONOR';
 export type DonorAvailability = 'AVAILABLE' | 'BUSY' | 'UNAVAILABLE';
-export type Page = 'landing' | 'role-select' | 'hospital' | 'blood-bank' | 'donor';
+export type Page =
+  | 'landing'
+  | 'role-select'
+  | 'login'
+  | 'register'
+  | 'hospital'
+  | 'blood-bank'
+  | 'donor';
 
+export type Role =
+  | 'HOSPITAL'
+  | 'BLOOD_BANK'
+  | 'DONOR';
 export interface BloodBank {
   id: string;
   name: string;

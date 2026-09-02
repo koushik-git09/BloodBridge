@@ -1,23 +1,85 @@
-import { useState } from 'react';
-import type { Page } from './types';
-import LandingPage from './pages/LandingPage';
-import RoleSelectorPage from './pages/RoleSelectorPage';
-import HospitalDashboard from './pages/HospitalDashboard';
-import BloodBankDashboard from './pages/BloodBankDashboard';
-import DonorDashboard from './pages/DonorDashboard';
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import LandingPage from "./pages/LandingPage";
+import RoleSelectorPage from "./pages/RoleSelectorPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+
+import HospitalDashboard from "./pages/HospitalDashboard";
+import BloodBankDashboard from "./pages/BloodBankDashboard";
+import DonorDashboard from "./pages/DonorDashboard";
+
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
-  const [page, setPage] = useState<Page>('landing');
-
-  const navigate = (p: Page) => setPage(p);
-
   return (
-    <div className="h-full">
-      {page === 'landing' && <LandingPage onNavigate={navigate} />}
-      {page === 'role-select' && <RoleSelectorPage onNavigate={navigate} />}
-      {page === 'hospital' && <HospitalDashboard onNavigate={navigate} />}
-      {page === 'blood-bank' && <BloodBankDashboard onNavigate={navigate} />}
-      {page === 'donor' && <DonorDashboard onNavigate={navigate} />}
-    </div>
+    <BrowserRouter>
+      <Routes>
+
+        {/* ================= PUBLIC ROUTES ================= */}
+
+        <Route
+          path="/"
+          element={<LandingPage />}
+        />
+
+        <Route
+          path="/roles"
+          element={<RoleSelectorPage />}
+        />
+
+
+        {/* ================= AUTH ROUTES ================= */}
+
+        <Route
+          path="/login/:role"
+          element={<LoginPage />}
+        />
+
+        <Route
+          path="/register/:role"
+          element={<RegisterPage />}
+        />
+
+
+        {/* ================= PROTECTED DASHBOARDS ================= */}
+
+        <Route
+          path="/dashboard/hospital"
+          element={
+            <ProtectedRoute allowedRole="HOSPITAL">
+              <HospitalDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/blood-bank"
+          element={
+            <ProtectedRoute allowedRole="BLOOD_BANK">
+              <BloodBankDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/donor"
+          element={
+            <ProtectedRoute allowedRole="DONOR">
+              <DonorDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* ================= FALLBACK ================= */}
+
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
+
+      </Routes>
+    </BrowserRouter>
   );
 }
