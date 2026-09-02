@@ -1,0 +1,45 @@
+# =========================
+# Python
+# =========================
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Python environment variables
+backend/.env
+.env
+
+# =========================
+# Node.js
+# =========================
+
+node_modules/
+frontend/node_modules/
+
+# Build files
+dist/
+build/
+
+# =========================
+# VS Code
+# =========================
+
+.vscode/
+
+# =========================
+# OS files
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+
+*.log
+npm-debug.log*
