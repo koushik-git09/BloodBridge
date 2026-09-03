@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { logout } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import type { DonorAvailability } from "../types";
 import { mockDonors } from "../data/mock";
@@ -322,16 +323,45 @@ export default function DonorDashboard() {
                 />
               </svg>
             </button>
+            {/* Donor name + Logout */}
             <div className="flex items-center gap-2">
-              <span
-                className="size-7 rounded-lg bg-bb-crimson/10 border border-bb-crimson/30 flex items-center justify-center text-sm"
-                aria-hidden="true"
+              <div className="size-8 rounded-full bg-bb-indigo/10 border border-bb-indigo/30 flex items-center justify-center font-bold text-bb-indigo text-xs">
+                {donor.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </div>
+
+              <span className="hidden md:block text-sm font-medium text-bb-text">
+                {donor.name}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/roles", { replace: true });
+                }}
+                className="ml-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-bb-border text-bb-muted text-sm font-semibold hover:text-bb-crimson hover:border-bb-crimson/40 transition-colors"
+                aria-label="Logout"
               >
-                🩸
-              </span>
-              <span className="font-bold text-bb-text tracking-tight">
-                Blood<span className="text-bb-crimson">Bridge</span>
-              </span>
+                <svg
+                  className="size-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"
+                  />
+                </svg>
+
+                <span className="hidden sm:block">Logout</span>
+              </button>
             </div>
           </div>
 
