@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { getCurrentUser } from "../services/authService";
 import type { Role } from "../types";
 
@@ -14,9 +14,12 @@ function dashboardPath(role: Role) {
     : `/dashboard/${role.toLowerCase()}`;
 }
 
-export default function ProtectedRoute({ allowedRole, children }: Props) {
+export default function ProtectedRoute({
+  allowedRole,
+  children,
+}: Props) {
   const location = useLocation();
-  const navigate = useNavigate();
+
   const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,14 +32,20 @@ export default function ProtectedRoute({ allowedRole, children }: Props) {
     getCurrentUser()
       .then((user) => {
         setRole(user.role);
-        localStorage.setItem("bloodbridge_user", JSON.stringify(user));
+        localStorage.setItem(
+          "bloodbridge_user",
+          JSON.stringify(user)
+        );
       })
       .catch(() => {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("bloodbridge_user");
+        setRole(null);
       })
-      .finally(() => setLoading(false));
-  }, [location.pathname, navigate]);
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [location.pathname]);
 
   if (loading) {
     return (
@@ -49,7 +58,11 @@ export default function ProtectedRoute({ allowedRole, children }: Props) {
   if (!role) {
     return (
       <Navigate
-        to={`/login/${allowedRole === "BLOOD_BANK" ? "blood-bank" : allowedRole.toLowerCase()}`}
+        to={`/login/${
+          allowedRole === "BLOOD_BANK"
+            ? "blood-bank"
+            : allowedRole.toLowerCase()
+        }`}
         replace
       />
     );
