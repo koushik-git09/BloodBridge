@@ -100,6 +100,7 @@ export const mockRequests: BloodRequest[] = [
     createdAt: '2024-04-10T10:42:00',
     bloodBankUnits: 3,
     donorUnits: 2,
+    remainingUnits: 0,
     donors: [mockDonors[0], mockDonors[1], mockDonors[2]],
     timeline: [
       { event: 'Request Created', time: '10:42 AM', completed: true },
@@ -120,6 +121,7 @@ export const mockRequests: BloodRequest[] = [
     createdAt: '2024-04-10T11:05:00',
     bloodBankUnits: 0,
     donorUnits: 0,
+    remainingUnits: 3,
     timeline: [
       { event: 'Request Created', time: '11:05 AM', completed: true },
       { event: 'Hospital Verification', time: '11:06 AM', completed: true },
@@ -137,6 +139,7 @@ export const mockRequests: BloodRequest[] = [
     createdAt: '2024-04-10T09:30:00',
     bloodBankUnits: 0,
     donorUnits: 2,
+    remainingUnits: 0,
     donors: [mockDonors[2], mockDonors[3]],
     timeline: [
       { event: 'Request Created', time: '09:30 AM', completed: true },

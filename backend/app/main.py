@@ -5,6 +5,7 @@ from app.database.mongodb import db
 from app.routers.auth import router as auth_router
 from app.routers.blood_banks import router as blood_bank_router
 from app.routers import blood_bank_reservations
+from app.routers.donor_matching import router as donor_matching_router
 
 app = FastAPI(
     title="BloodBridge API",
@@ -30,6 +31,7 @@ app.include_router(blood_bank_router)
 app.include_router(
     blood_bank_reservations.router
 )
+app.include_router(donor_matching_router)
 @app.get("/")
 async def root():
     return {

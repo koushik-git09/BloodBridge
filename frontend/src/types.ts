@@ -65,6 +65,7 @@ export interface BloodRequest {
   createdAt: string;
   bloodBankUnits: number;
   donorUnits: number;
+  remainingUnits: number;
   timeline: TimelineEvent[];
   donors?: Donor[];
 }

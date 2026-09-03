@@ -5,6 +5,7 @@ import { logout } from "../services/authService";
 import type {
   BloodGroup,
   BloodRequest,
+  Donor,
   Urgency,
 } from "../types";
 
@@ -146,6 +147,27 @@ function mapApiRequestToBloodRequest(
     },
   ];
 
+  const donorMatches =
+    request.donors ?? request.donor_matches ?? [];
+
+  const donors: Donor[] = donorMatches.map((donor) => ({
+    id: donor.donor_id,
+    name: donor.name,
+    bloodGroup: donor.blood_group,
+    availability: donor.availability,
+    distance: donor.distance,
+    matchScore: donor.match_score,
+    responses: donor.donation_count,
+    lastDonation: "Not available",
+    scores: {
+      compatibility: 100,
+      eligibility: 100,
+      distance: Math.max(0, Math.min(100, 100 - donor.distance * 4)),
+      availability: donor.availability === "AVAILABLE" ? 100 : 0,
+      reliability: donor.trust_score,
+    },
+  }));
+
   return {
     id: request.id,
 
@@ -165,6 +187,10 @@ function mapApiRequestToBloodRequest(
     bloodBankUnits: request.blood_bank_units,
 
     donorUnits: request.donor_units,
+
+    remainingUnits: request.remaining_units,
+
+    donors,
 
     timeline,
   };
@@ -868,7 +894,7 @@ export default function HospitalDashboard() {
 
                       <span className="font-mono text-sm font-bold text-bb-indigo">
                         {
-                          selectedReq.donorUnits
+                          selectedReq.remainingUnits
                         }{" "}
                         needed
                       </span>
@@ -881,10 +907,10 @@ export default function HospitalDashboard() {
                         className="progress-fill bg-bb-indigo"
                         style={{
                           width:
-                            selectedReq.donorUnits >
+                            selectedReq.remainingUnits >
                             0
                               ? `${Math.min(
-                                  (selectedReq.donorUnits /
+                                  (selectedReq.remainingUnits /
                                     selectedReq.unitsRequired) *
                                     100,
                                   100,

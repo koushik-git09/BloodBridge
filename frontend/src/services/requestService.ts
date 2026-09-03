@@ -1,6 +1,18 @@
 import { apiRequest } from "./api";
 import type { BloodGroup, Urgency } from "../types";
 
+export interface DonorMatchResponse {
+  donor_id: string;
+  name: string;
+  blood_group: BloodGroup;
+  availability: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
+  distance: number;
+  match_score: number;
+  trust_score: number;
+  donation_count: number;
+  status: string;
+}
+
 export interface BloodRequestResponse {
   id: string;
   hospital_id: string;
@@ -16,11 +28,14 @@ export interface BloodRequestResponse {
 
   blood_bank_units: number;
   donor_units: number;
-  remaining_units?: number;
+  remaining_units: number;
 
   notes?: string;
 
   created_at: string;
+  donors?: DonorMatchResponse[];
+  // Accepted during migration if an older API deployment uses this field.
+  donor_matches?: DonorMatchResponse[];
 }
 
 export interface CreateBloodRequestData {
