@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from bson import ObjectId
-
-from app.database.mongodb import db
-from app.services.reservation_service import (
+from app.services.blood_bank_matching_service import (
     create_blood_bank_reservations,
 )
+from app.database.mongodb import db
+
 
 def serialize_request(request: dict) -> dict:
     """Convert MongoDB document into API-friendly format."""
@@ -37,56 +37,53 @@ def serialize_request(request: dict) -> dict:
 
 async def create_blood_request(
     request_data,
-    hospital_user: dict
+    hospital_user: dict,
 ):
-    """Create a trusted hospital blood request and notify nearby blood banks."""
-
     request_document = {
         "hospital_id": hospital_user["id"],
-
         "hospital_name": hospital_user.get(
             "hospitalName",
-            hospital_user.get("name")
+            hospital_user.get("name"),
         ),
-
         "patient_reference": request_data.patient_reference,
         "blood_group": request_data.blood_group,
         "units_required": request_data.units_required,
         "urgency": request_data.urgency,
-
-        # The system will now check nearby blood banks
         "status": "CHECKING_BLOOD_BANK",
-
         "blood_bank_units": 0,
         "donor_units": 0,
-
         "remaining_units": request_data.units_required,
-
         "notes": request_data.notes,
-
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }
 
-    # STEP 1: Save blood request
     result = await db.blood_requests.insert_one(
         request_document
     )
 
     request_document["_id"] = result.inserted_id
 
-    # STEP 2: Automatically find nearby blood banks
-    # and create reservation requests
-    await create_blood_bank_reservations(
-        request_id=str(result.inserted_id),
-        hospital_id=hospital_user["id"],
-        blood_group=request_data.blood_group,
-        units_required=request_data.units_required,
-    )
+    # -----------------------------------------------------
+    # AUTOMATIC BLOOD BANK MATCHING
+    # -----------------------------------------------------
 
-    # STEP 3: Return the created request
+    hospital = await db.users.find_one({
+        "_id": ObjectId(hospital_user["id"]),
+        "role": "HOSPITAL",
+    })
+
+    if hospital and hospital.get("location"):
+
+        await create_blood_bank_reservations(
+            request_id=str(result.inserted_id),
+            hospital_id=hospital_user["id"],
+            blood_group=request_data.blood_group,
+            units_required=request_data.units_required,
+            hospital_location=hospital["location"],
+        )
+
     return serialize_request(request_document)
-
 async def get_request_by_id(request_id: str):
 
     try:
