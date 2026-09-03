@@ -6,34 +6,149 @@ from app.services.blood_bank_matching_service import (
 from app.database.mongodb import db
 
 
-def serialize_request(request: dict) -> dict:
-    """Convert MongoDB document into API-friendly format."""
+def calculate_remaining_units(request: dict) -> int:
+    """Return the unfulfilled units, including both fulfillment sources."""
+    return max(
+        int(request.get("units_required", 0))
+        - int(request.get("blood_bank_units", 0))
+        - int(request.get("donor_units", 0)),
+        0,
+    )
+
+
+async def serialize_request(
+    request: dict,
+) -> dict:
+    """
+    Convert MongoDB blood request into API response,
+    including persisted donor matches.
+    """
+
+    donor_matches = []
+
+    cursor = db.donor_matches.find(
+        {
+            "request_id": str(
+                request["_id"]
+            )
+        }
+    ).sort(
+        "match_score",
+        -1,
+    ).limit(10)
+
+    async for match in cursor:
+
+        try:
+            donor = await db.users.find_one(
+                {
+                    "_id": ObjectId(match["donor_id"]),
+                    "role": "DONOR",
+                }
+            )
+        except Exception:
+            continue
+
+        if not donor:
+            continue
+
+        donor_matches.append({
+            "donor_id": match["donor_id"],
+
+            "name": donor.get(
+                "name",
+                "Donor",
+            ),
+
+            "blood_group": match[
+                "blood_group"
+            ],
+
+            "availability": donor.get(
+                "availability",
+                "AVAILABLE",
+            ),
+
+            "distance": match[
+                "distance"
+            ],
+
+            "match_score": match[
+                "match_score"
+            ],
+
+            "trust_score": match[
+                "trust_score"
+            ],
+
+            "donation_count": match.get(
+                "donation_count",
+                0,
+            ),
+
+            "status": match.get(
+                "status",
+                "PENDING",
+            ),
+        })
 
     return {
-        "id": str(request["_id"]),
-        "hospital_id": str(request["hospital_id"]),
-        "hospital_name": request.get("hospital_name"),
-
-        "patient_reference": request["patient_reference"],
-        "blood_group": request["blood_group"],
-        "units_required": request["units_required"],
-        "urgency": request["urgency"],
-
-        "status": request["status"],
-
-        "blood_bank_units": request.get("blood_bank_units", 0),
-        "donor_units": request.get("donor_units", 0),
-
-        "remaining_units": request.get(
-            "remaining_units",
-            request["units_required"]
+        "id": str(
+            request["_id"]
         ),
 
-        "notes": request.get("notes"),
+        "hospital_id": str(
+            request["hospital_id"]
+        ),
 
-        "created_at": request["created_at"],
+        "hospital_name": request.get(
+            "hospital_name"
+        ),
+
+        "patient_reference": request[
+            "patient_reference"
+        ],
+
+        "blood_group": request[
+            "blood_group"
+        ],
+
+        "units_required": request[
+            "units_required"
+        ],
+
+        "urgency": request[
+            "urgency"
+        ],
+
+        "status": request[
+            "status"
+        ],
+
+        "blood_bank_units": request.get(
+            "blood_bank_units",
+            0,
+        ),
+
+        "donor_units": request.get(
+            "donor_units",
+            0,
+        ),
+
+        # Calculate rather than trust a legacy stored value so every response
+        # reflects all confirmed blood-bank and donor contributions.
+        "remaining_units": calculate_remaining_units(request),
+
+        "notes": request.get(
+            "notes"
+        ),
+
+        "created_at": request[
+            "created_at"
+        ],
+
+        "donors": donor_matches,
     }
-
 
 async def create_blood_request(
     request_data,
@@ -83,7 +198,9 @@ async def create_blood_request(
             hospital_location=hospital["location"],
         )
 
-    return serialize_request(request_document)
+    return await serialize_request(
+    request_document
+)
 async def get_request_by_id(request_id: str):
 
     try:
@@ -97,20 +214,30 @@ async def get_request_by_id(request_id: str):
     if not request:
         return None
 
-    return serialize_request(request)
+    return await serialize_request(
+    request
+)
 
 
-async def get_hospital_requests(hospital_id: str):
-
+async def get_hospital_requests(
+    hospital_id: str,
+):
     requests = []
 
     cursor = db.blood_requests.find(
-        {"hospital_id": hospital_id}
-    ).sort("created_at", -1)
+        {
+            "hospital_id": hospital_id
+        }
+    ).sort(
+        "created_at",
+        -1,
+    )
 
     async for request in cursor:
         requests.append(
-            serialize_request(request)
+            await serialize_request(
+                request
+            )
         )
 
     return requests
