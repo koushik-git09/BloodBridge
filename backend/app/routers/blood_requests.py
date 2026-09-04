@@ -4,11 +4,11 @@ from app.schemas.blood_request import (
     BloodRequestCreate,
     BloodRequestResponse,
 )
-
 from app.services.request_service import (
     create_blood_request,
     get_hospital_requests,
     get_request_by_id,
+    confirm_donation as confirm_donation_service,
 )
 
 from app.dependencies.auth import require_role
@@ -48,7 +48,6 @@ async def get_my_requests(
         current_user["id"]
     )
 
-
 @router.get(
     "/{request_id}",
     response_model=BloodRequestResponse,
@@ -74,3 +73,59 @@ async def get_request(
         )
 
     return request
+@router.patch(
+    "/{request_id}/donors/{donor_request_id}/confirm-donation",
+    response_model=BloodRequestResponse,
+)
+async def confirm_donation(
+    request_id: str,
+    donor_request_id: str,
+    current_user=Depends(
+        require_role("HOSPITAL")
+    ),
+):
+    """
+    Hospital confirms that an accepted donor has
+    completed the blood donation.
+    """
+
+    donation, error = await confirm_donation_service(
+        donor_request_id=donor_request_id,
+        request_id=request_id,
+        hospital_id=current_user["id"],
+    )
+
+    if error == "NOT_FOUND":
+        raise HTTPException(
+            status_code=404,
+            detail="Donor request not found",
+        )
+
+    if error == "FORBIDDEN":
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to confirm this donation",
+        )
+
+    if error == "INVALID_STATUS":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Donation can only be confirmed "
+                "after the donor accepts the request"
+            ),
+        )
+
+    if error == "ALREADY_RESPONDED":
+        raise HTTPException(
+            status_code=400,
+            detail="This donation has already been confirmed",
+        )
+
+    if error == "REQUEST_NOT_FOUND":
+        raise HTTPException(
+            status_code=404,
+            detail="Blood request not found",
+        )
+
+    return donation

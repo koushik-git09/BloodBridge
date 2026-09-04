@@ -38,6 +38,8 @@ class BloodRequestCreate(BaseModel):
 class DonorMatchResponse(BaseModel):
     donor_id: str
 
+    donor_request_id: str | None = None
+
     name: str
 
     blood_group: str

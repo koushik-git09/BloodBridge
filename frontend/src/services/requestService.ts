@@ -3,6 +3,7 @@ import type { BloodGroup, Urgency } from "../types";
 
 export interface DonorMatchResponse {
   donor_id: string;
+  donor_request_id?: string | null;
   name: string;
   blood_group: BloodGroup;
   availability: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
@@ -10,7 +11,7 @@ export interface DonorMatchResponse {
   match_score: number;
   trust_score: number;
   donation_count: number;
-  status: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "DONATED";
 }
 
 export interface BloodRequestResponse {
@@ -67,4 +68,14 @@ export async function createBloodRequest(
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function confirmDonorDonation(
+  requestId: string,
+  donorRequestId: string,
+): Promise<BloodRequestResponse> {
+  return apiRequest<BloodRequestResponse>(
+    `/api/requests/${requestId}/donors/${donorRequestId}/confirm-donation`,
+    { method: "PATCH" },
+  );
 }

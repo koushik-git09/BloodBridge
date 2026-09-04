@@ -87,6 +87,9 @@ async def get_donor_requests_for_donor(
 
         request["id"] = str(request["_id"])
         del request["_id"]
+        request["donated_at"] = request.get(
+    "donated_at"
+)
 
         # Get blood request information
         try:
@@ -180,6 +183,223 @@ async def respond_to_donor_request(
             "_id": ObjectId(donor_request_id)
         }
     )
+
+    updated_request["id"] = str(
+        updated_request["_id"]
+    )
+
+    del updated_request["_id"]
+
+    return updated_request, None
+        # Keep the hospital-facing donor match synchronized
+    await db.donor_matches.update_one(
+        {
+            "request_id": donor_request["request_id"],
+            "donor_id": donor_request["donor_id"],
+        },
+        {
+            "$set": {
+                "status": new_status,
+                "responded_at": datetime.now(
+                    timezone.utc
+                ),
+            }
+        },
+    )
+async def confirm_donor_donation(
+    donor_request_id: str,
+    request_id: str,
+    hospital_id: str,
+):
+    """
+    Hospital confirms that an accepted donor has actually
+    completed the blood donation.
+    """
+
+    # -----------------------------------------------------
+    # Find donor request
+    # -----------------------------------------------------
+
+    try:
+        donor_request = await db.donor_requests.find_one(
+            {
+                "_id": ObjectId(donor_request_id)
+            }
+        )
+    except Exception:
+        return None, "NOT_FOUND"
+
+    if not donor_request:
+        return None, "NOT_FOUND"
+
+    # -----------------------------------------------------
+    # Verify this donor request belongs to the blood request
+    # -----------------------------------------------------
+
+    if donor_request.get("request_id") != request_id:
+        return None, "FORBIDDEN"
+
+    # -----------------------------------------------------
+    # Verify hospital ownership
+    # -----------------------------------------------------
+
+    if donor_request.get("hospital_id") != hospital_id:
+        return None, "FORBIDDEN"
+
+    # -----------------------------------------------------
+    # Donation can only be confirmed after donor accepts
+    # -----------------------------------------------------
+
+    if donor_request.get("status") != "ACCEPTED":
+        return None, "INVALID_STATUS"
+
+    now = datetime.now(timezone.utc)
+
+    donor_id = donor_request["donor_id"]
+
+    # -----------------------------------------------------
+    # Mark donor request as DONATED
+    # -----------------------------------------------------
+
+    result = await db.donor_requests.update_one(
+        {
+            "_id": ObjectId(donor_request_id),
+            "status": "ACCEPTED",
+        },
+        {
+            "$set": {
+                "status": "DONATED",
+                "donated_at": now,
+            }
+        },
+    )
+
+    if result.modified_count == 0:
+        return None, "ALREADY_RESPONDED"
+
+    # -----------------------------------------------------
+    # Create donation history record
+    # -----------------------------------------------------
+
+    donation_document = {
+        "donor_id": donor_id,
+        "request_id": request_id,
+        "hospital_id": hospital_id,
+        "blood_group": donor_request["blood_group"],
+        "units": 1,
+        "donated_at": now,
+        "status": "COMPLETED",
+        "donor_request_id": donor_request_id,
+    }
+
+    await db.donations.insert_one(
+        donation_document
+    )
+
+    # -----------------------------------------------------
+    # Update donor statistics
+    # -----------------------------------------------------
+
+    await db.users.update_one(
+        {
+            "_id": ObjectId(donor_id),
+            "role": "DONOR",
+        },
+        {
+            "$inc": {
+                "donationCount": 1,
+            },
+            "$set": {
+                "lastDonation": now,
+            },
+        },
+    )
+
+    # -----------------------------------------------------
+    # Update blood request
+    # -----------------------------------------------------
+
+    try:
+        blood_request = await db.blood_requests.find_one(
+            {
+                "_id": ObjectId(request_id)
+            }
+        )
+    except Exception:
+        blood_request = None
+
+    if not blood_request:
+        return None, "REQUEST_NOT_FOUND"
+
+    current_donor_units = int(
+        blood_request.get(
+            "donor_units",
+            0,
+        )
+    )
+
+    new_donor_units = current_donor_units + 1
+
+    units_required = int(
+        blood_request.get(
+            "units_required",
+            0,
+        )
+    )
+
+    blood_bank_units = int(
+        blood_request.get(
+            "blood_bank_units",
+            0,
+        )
+    )
+
+    remaining_units = max(
+        units_required
+        - blood_bank_units
+        - new_donor_units,
+        0,
+    )
+
+    # -----------------------------------------------------
+    # Determine request status
+    # -----------------------------------------------------
+
+    if remaining_units == 0:
+        new_status = "FULFILLED"
+    else:
+        new_status = "DONOR_MATCHING"
+
+    # -----------------------------------------------------
+    # Update blood request
+    # -----------------------------------------------------
+
+    await db.blood_requests.update_one(
+        {
+            "_id": ObjectId(request_id)
+        },
+        {
+            "$set": {
+                "donor_units": new_donor_units,
+                "remaining_units": remaining_units,
+                "status": new_status,
+                "updated_at": now,
+            }
+        },
+    )
+
+    # -----------------------------------------------------
+    # Return updated donor request
+    # -----------------------------------------------------
+
+    updated_request = await db.donor_requests.find_one(
+        {
+            "_id": ObjectId(donor_request_id)
+        }
+    )
+
+    if not updated_request:
+        return None, "NOT_FOUND"
 
     updated_request["id"] = str(
         updated_request["_id"]

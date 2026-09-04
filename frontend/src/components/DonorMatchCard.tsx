@@ -4,8 +4,8 @@ import BloodGroupBadge from './BloodGroupBadge';
 
 interface Props {
   donor: Donor;
-  onAccept?: () => void;
-  onDecline?: () => void;
+  onConfirmDonation?: () => void;
+  isConfirmingDonation?: boolean;
   viewMode?: 'hospital' | 'donor';
 }
 
@@ -32,9 +32,15 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export default function DonorMatchCard({ donor, onAccept, onDecline, viewMode = 'hospital' }: Props) {
+export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingDonation = false, viewMode = 'hospital' }: Props) {
   const [expanded, setExpanded] = useState(false);
   const scoreColor = donor.matchScore >= 90 ? 'text-bb-teal-bright' : donor.matchScore >= 75 ? 'text-bb-indigo' : 'text-bb-amber';
+  const response = {
+    PENDING: { label: 'Waiting for donor response', className: 'text-bb-amber bg-bb-amber/10 border-bb-amber/25' },
+    ACCEPTED: { label: 'Donor Accepted', className: 'text-bb-teal bg-bb-teal/10 border-bb-teal/25' },
+    DECLINED: { label: 'Donor Declined', className: 'text-bb-crimson bg-bb-crimson/10 border-bb-crimson/25' },
+    DONATED: { label: 'Donation Confirmed', className: 'text-bb-green bg-bb-green/10 border-bb-green/25' },
+  }[donor.status];
 
   return (
     <div className="glass rounded-xl overflow-hidden transition-all duration-200 hover:border-bb-border-light">
@@ -60,6 +66,9 @@ export default function DonorMatchCard({ donor, onAccept, onDecline, viewMode = 
             </div>
           </div>
           <div className="text-right shrink-0">
+            <span className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold ${response.className}`}>
+              {donor.status === 'DONATED' ? '✓ ' : ''}{response.label}
+            </span>
             <div className={`font-mono text-2xl font-bold ${scoreColor}`}>{donor.matchScore}%</div>
             <div className="text-xs text-bb-muted">match score</div>
           </div>
@@ -81,19 +90,18 @@ export default function DonorMatchCard({ donor, onAccept, onDecline, viewMode = 
             <span className="text-bb-border">·</span>
             <span>{donor.responses} responses</span>
           </div>
-          {viewMode === 'hospital' && (onAccept || onDecline) && (
-            <div className="flex gap-2 pt-1">
+          {viewMode === 'hospital' && donor.status === 'ACCEPTED' && onConfirmDonation && (
+            <div className="pt-1">
               <button
-                onClick={onAccept}
-                className="flex-1 rounded-lg bg-bb-teal/15 border border-bb-teal/30 py-2 text-xs font-semibold text-bb-teal-bright hover:bg-bb-teal/25 transition-colors"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onConfirmDonation();
+                }}
+                disabled={isConfirmingDonation}
+                className="w-full rounded-lg bg-bb-teal/15 border border-bb-teal/30 py-2 text-xs font-semibold text-bb-teal-bright hover:bg-bb-teal/25 transition-colors disabled:opacity-50"
               >
-                Notify Donor
-              </button>
-              <button
-                onClick={onDecline}
-                className="flex-1 rounded-lg bg-bb-surface border border-bb-border py-2 text-xs font-semibold text-bb-muted hover:text-bb-text hover:border-bb-border-light transition-colors"
-              >
-                Skip
+                {isConfirmingDonation ? 'Confirming…' : 'Confirm Donation'}
               </button>
             </div>
           )}
