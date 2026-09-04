@@ -4,7 +4,9 @@ from app.services.blood_bank_matching_service import (
     create_blood_bank_reservations,
 )
 from app.database.mongodb import db
-
+from app.services.donor_request_service import (
+    create_donor_requests_for_blood_request,
+)
 
 def calculate_remaining_units(request: dict) -> int:
     """Return the unfulfilled units, including both fulfillment sources."""
@@ -196,6 +198,12 @@ async def create_blood_request(
             blood_group=request_data.blood_group,
             units_required=request_data.units_required,
             hospital_location=hospital["location"],
+        )
+        await create_donor_requests_for_blood_request(
+        request_id=str(result.inserted_id),
+        hospital_id=hospital_user["id"],
+        blood_group=request_data.blood_group,
+        hospital_location=hospital["location"],
         )
 
     return await serialize_request(
