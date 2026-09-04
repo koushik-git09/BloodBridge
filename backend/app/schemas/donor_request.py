@@ -29,11 +29,18 @@ class DonorRequestResponse(BaseModel):
 
     trust_score: float
 
-    status: str
+    status: Literal[
+        "PENDING",
+        "ACCEPTED",
+        "DECLINED",
+        "DONATED",
+    ]
 
     created_at: datetime
 
     responded_at: datetime | None = None
+
+    donated_at: datetime | None = None
 
 
 class DonorRequestUpdate(BaseModel):

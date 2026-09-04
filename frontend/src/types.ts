@@ -9,6 +9,11 @@ export type RequestStatus =
   | 'FULFILLED'
   | 'CONFIRMED';
 export type DonorAvailability = 'AVAILABLE' | 'BUSY' | 'UNAVAILABLE';
+export type DonorRequestStatus =
+  | 'PENDING'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'DONATED';
 export type Page =
   | 'landing'
   | 'role-select'
@@ -32,6 +37,8 @@ export interface BloodBank {
 
 export interface Donor {
   id: string;
+  donorRequestId?: string;
+  status: DonorRequestStatus;
   name: string;
   bloodGroup: BloodGroup;
   availability: DonorAvailability;

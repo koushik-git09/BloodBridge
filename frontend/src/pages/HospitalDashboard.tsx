@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createBloodRequest } from "../services/requestService";
+import {
+  confirmDonorDonation,
+  createBloodRequest,
+  getHospitalRequests,
+} from "../services/requestService";
 import { logout } from "../services/authService";
 import type {
   BloodGroup,
@@ -9,7 +13,6 @@ import type {
   Urgency,
 } from "../types";
 
-import { getHospitalRequests } from "../services/requestService";
 
 import UrgencyBadge from "../components/UrgencyBadge";
 import BloodGroupBadge from "../components/BloodGroupBadge";
@@ -152,6 +155,8 @@ function mapApiRequestToBloodRequest(
 
   const donors: Donor[] = donorMatches.map((donor) => ({
     id: donor.donor_id,
+    donorRequestId: donor.donor_request_id ?? undefined,
+    status: donor.status,
     name: donor.name,
     bloodGroup: donor.blood_group,
     availability: donor.availability,
@@ -222,6 +227,9 @@ export default function HospitalDashboard() {
   const [requestError, setRequestError] =
     useState<string | null>(null);
 
+  const [confirmingDonorRequestId, setConfirmingDonorRequestId] =
+    useState<string | null>(null);
+
 
   /* =======================================================
      UI STATE
@@ -245,8 +253,7 @@ export default function HospitalDashboard() {
      LOAD REAL HOSPITAL REQUESTS
   ======================================================= */
 
-  useEffect(() => {
-    async function loadRequests() {
+  const loadRequests = useCallback(async () => {
       try {
         setLoadingRequests(true);
 
@@ -260,8 +267,10 @@ export default function HospitalDashboard() {
 
         setRequests(mappedRequests);
 
-        setSelectedReq(
-          mappedRequests[0] ?? null,
+        setSelectedReq((current) =>
+          mappedRequests.find((request) => request.id === current?.id) ??
+          mappedRequests[0] ??
+          null,
         );
       } catch (error) {
         console.error(
@@ -277,10 +286,39 @@ export default function HospitalDashboard() {
       } finally {
         setLoadingRequests(false);
       }
-    }
-
-    loadRequests();
   }, []);
+
+  useEffect(() => {
+    void loadRequests();
+
+    // Donor responses can arrive while the hospital is viewing this page, so
+    // periodically refresh from the backend instead of retaining stale state.
+    const refreshInterval = window.setInterval(() => {
+      void loadRequests();
+    }, 15_000);
+
+    return () => window.clearInterval(refreshInterval);
+  }, [loadRequests]);
+
+  const handleConfirmDonation = async (
+    donorRequestId: string,
+  ) => {
+    if (!selectedReq) return;
+
+    try {
+      setConfirmingDonorRequestId(donorRequestId);
+      await confirmDonorDonation(selectedReq.id, donorRequestId);
+      await loadRequests();
+    } catch (error) {
+      setRequestError(
+        error instanceof Error
+          ? error.message
+          : "Failed to confirm donation",
+      );
+    } finally {
+      setConfirmingDonorRequestId(null);
+    }
+  };
 
 
   /* =======================================================
@@ -1029,8 +1067,18 @@ export default function HospitalDashboard() {
                               key={d.id}
                               donor={d}
                               viewMode="hospital"
-                              onAccept={() => {}}
-                              onDecline={() => {}}
+                              onConfirmDonation={
+                                d.donorRequestId
+                                  ? () =>
+                                      handleConfirmDonation(
+                                        d.donorRequestId!,
+                                      )
+                                  : undefined
+                              }
+                              isConfirmingDonation={
+                                confirmingDonorRequestId ===
+                                d.donorRequestId
+                              }
                             />
 
                           ),
