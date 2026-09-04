@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { logout } from "../services/authService";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+import { logout, getCurrentUser } from "../services/authService";
+import { apiRequest } from "../services/api";
 import type { DonorAvailability } from "../types";
-import { mockDonors } from "../data/mock";
 import UrgencyBadge from "../components/UrgencyBadge";
 
 type Tab = "overview" | "history" | "requirements";
@@ -15,6 +16,50 @@ type AvailabilityOption = {
   border: string;
   icon: string;
   desc: string;
+};
+
+type DonorRequest = {
+  id: string;
+  request_id: string;
+  donor_id: string;
+  hospital_id: string;
+
+  hospital_name: string | null;
+  patient_reference: string | null;
+
+  blood_group: string;
+  units_required: number | null;
+  urgency: string | null;
+
+  distance: number;
+  match_score: number;
+  trust_score: number;
+
+  status: string;
+
+  created_at: string;
+  responded_at: string | null;
+};
+
+type DonorProfile = {
+  name?: string;
+  bloodGroup?: string;
+  blood_group?: string;
+
+  availability?: DonorAvailability;
+
+  donationCount?: number;
+  donation_count?: number;
+
+  trustScore?: number;
+  trust_score?: number;
+
+  lastDonation?: string | null;
+  last_donation_date?: string | null;
+
+  responses?: number;
+
+  [key: string]: unknown;
 };
 
 const availabilityOptions: AvailabilityOption[] = [
@@ -47,6 +92,13 @@ const availabilityOptions: AvailabilityOption[] = [
   },
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Donation history
+|--------------------------------------------------------------------------
+| Kept as UI data for now.
+| We can connect this to a backend endpoint later.
+*/
 const donorHistory = [
   {
     date: "Feb 15, 2024",
@@ -90,6 +142,11 @@ const donorHistory = [
   },
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Donation requirements
+|--------------------------------------------------------------------------
+*/
 const requirementCategories = [
   {
     title: "Basic Eligibility",
@@ -98,8 +155,14 @@ const requirementCategories = [
     bg: "rgba(16,185,129,0.08)",
     border: "rgba(16,185,129,0.25)",
     rules: [
-      { label: "Age", detail: "Must be between 18 and 65 years old." },
-      { label: "Weight", detail: "Minimum body weight of 50 kg (110 lbs)." },
+      {
+        label: "Age",
+        detail: "Must be between 18 and 65 years old.",
+      },
+      {
+        label: "Weight",
+        detail: "Minimum body weight of 50 kg (110 lbs).",
+      },
       {
         label: "Pulse",
         detail: "Regular pulse rate between 50–100 beats per minute.",
@@ -249,59 +312,333 @@ const requirementCategories = [
   },
 ];
 
-const incomingRequest = {
-  bloodGroup: "O+" as const,
-  urgency: "CRITICAL" as const,
-  hospital: "Apollo Hospitals",
-  distance: 4.2,
-  matchScore: 94,
-  postedAt: "10:47 AM",
-};
-
-const donor = mockDonors[0];
-
 export default function DonorDashboard() {
   const navigate = useNavigate();
+
+  // -------------------------------------------------------
+  // UI state
+  // -------------------------------------------------------
+  const handleAvailabilityChange = async (
+    newAvailability: DonorAvailability,
+  ) => {
+    try {
+      await apiRequest("/api/users/me/availability", {
+        method: "PATCH",
+        body: JSON.stringify({
+          availability: newAvailability,
+        }),
+      });
+
+      setAvailability(newAvailability);
+      setShowAvailMenu(false);
+
+      setToast(`Availability changed to ${newAvailability.toLowerCase()}.`);
+
+      setTimeout(() => {
+        setToast(null);
+      }, 3000);
+    } catch (error) {
+      console.error("Failed to update availability:", error);
+
+      setToast(
+        error instanceof Error
+          ? error.message
+          : "Failed to update availability.",
+      );
+
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    }
+  };
   const [tab, setTab] = useState<Tab>("overview");
+
   const [availability, setAvailability] =
     useState<DonorAvailability>("AVAILABLE");
+
   const [showAvailMenu, setShowAvailMenu] = useState(false);
-  const [requestResponse, setRequestResponse] = useState<
-    "pending" | "accepted" | "declined"
-  >("pending");
-  const [showRequest, setShowRequest] = useState(true);
+
   const [toast, setToast] = useState<string | null>(null);
+
   const [openCategory, setOpenCategory] = useState<string | null>(
     "Basic Eligibility",
   );
 
-  const currentAvail = availabilityOptions.find((o) => o.key === availability)!;
+  // -------------------------------------------------------
+  // Backend data
+  // -------------------------------------------------------
 
-  const handleAccept = () => {
-    setRequestResponse("accepted");
-    setShowRequest(false);
-    setToast("✓ Response recorded. The hospital has been notified.");
-    setTimeout(() => setToast(null), 4000);
-  };
+  const [donor, setDonor] = useState<DonorProfile | null>(null);
 
-  const handleDecline = () => {
-    setRequestResponse("declined");
-    setShowRequest(false);
-    setToast("Response recorded. Thank you.");
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [donorRequests, setDonorRequests] = useState<DonorRequest[]>([]);
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: "overview", label: "Overview", icon: "🩸" },
-    { key: "history", label: "Donation History", icon: "📋" },
-    { key: "requirements", label: "Requirements", icon: "📋" },
+  const [loading, setLoading] = useState(true);
+
+  const [requestLoading, setRequestLoading] = useState<string | null>(null);
+
+  const [error, setError] = useState<string | null>(null);
+
+  // -------------------------------------------------------
+  // Current availability
+  // -------------------------------------------------------
+
+  const currentAvail =
+    availabilityOptions.find((o) => o.key === availability) ??
+    availabilityOptions[0];
+
+  // -------------------------------------------------------
+  // Load donor dashboard
+  // -------------------------------------------------------
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  async function loadDashboard() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // -----------------------------------------------
+      // Get logged-in donor
+      // -----------------------------------------------
+
+      const user = await getCurrentUser();
+
+      const donorData = user as DonorProfile;
+
+      setDonor(donorData);
+
+      // -----------------------------------------------
+      // Get donor availability
+      // -----------------------------------------------
+
+      const donorAvailability = donorData.availability;
+
+      if (
+        donorAvailability === "AVAILABLE" ||
+        donorAvailability === "BUSY" ||
+        donorAvailability === "UNAVAILABLE"
+      ) {
+        setAvailability(donorAvailability);
+      }
+
+      // -----------------------------------------------
+      // Get donor requests
+      // -----------------------------------------------
+
+      const requests = await apiRequest<DonorRequest[]>("/api/donor-requests");
+
+      setDonorRequests(requests);
+    } catch (err) {
+      console.error("Failed to load donor dashboard:", err);
+
+      setError(
+        err instanceof Error ? err.message : "Failed to load donor dashboard",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // -------------------------------------------------------
+  // Accept donor request
+  // -------------------------------------------------------
+
+  async function handleAccept(donorRequestId: string) {
+    try {
+      setRequestLoading(donorRequestId);
+
+      const updatedRequest = await apiRequest<DonorRequest>(
+        `/api/donor-requests/${donorRequestId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            action: "ACCEPT",
+          }),
+        },
+      );
+
+      // Update the request in local state
+      setDonorRequests((previous) =>
+        previous.map((request) =>
+          request.id === donorRequestId ? updatedRequest : request,
+        ),
+      );
+
+      setToast("✓ Response recorded. The hospital has been notified.");
+
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    } catch (err) {
+      console.error("Failed to accept donor request:", err);
+
+      setToast(err instanceof Error ? err.message : "Failed to accept request");
+
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    } finally {
+      setRequestLoading(null);
+    }
+  }
+
+  // -------------------------------------------------------
+  // Decline donor request
+  // -------------------------------------------------------
+
+  async function handleDecline(donorRequestId: string) {
+    try {
+      setRequestLoading(donorRequestId);
+
+      const updatedRequest = await apiRequest<DonorRequest>(
+        `/api/donor-requests/${donorRequestId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            action: "DECLINE",
+          }),
+        },
+      );
+
+      // Update local state
+      setDonorRequests((previous) =>
+        previous.map((request) =>
+          request.id === donorRequestId ? updatedRequest : request,
+        ),
+      );
+
+      setToast("Response recorded. Thank you.");
+
+      setTimeout(() => {
+        setToast(null);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to decline donor request:", err);
+
+      setToast(
+        err instanceof Error ? err.message : "Failed to decline request",
+      );
+
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    } finally {
+      setRequestLoading(null);
+    }
+  }
+
+  // -------------------------------------------------------
+  // Logout
+  // -------------------------------------------------------
+
+  function handleLogout() {
+    logout();
+
+    navigate("/roles", {
+      replace: true,
+    });
+  }
+
+  // -------------------------------------------------------
+  // Donor information helpers
+  // -------------------------------------------------------
+
+  const donorName = donor?.name ?? "Donor";
+
+  const donorBloodGroup = donor?.bloodGroup ?? donor?.blood_group ?? "—";
+
+  const donationCount =
+    donor?.donationCount ?? donor?.donation_count ?? donorHistory.length;
+
+  const trustScore = donor?.trustScore ?? donor?.trust_score ?? 50;
+
+  const initials = donorName
+    .split(" ")
+    .filter(Boolean)
+    .map((name) => name[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  // -------------------------------------------------------
+  // Requests
+  // -------------------------------------------------------
+
+  const pendingRequests = donorRequests.filter(
+    (request) => request.status === "PENDING",
+  );
+
+  const acceptedRequests = donorRequests.filter(
+    (request) => request.status === "ACCEPTED",
+  );
+
+  const declinedRequests = donorRequests.filter(
+    (request) => request.status === "DECLINED",
+  );
+
+  // -------------------------------------------------------
+  // Tabs
+  // -------------------------------------------------------
+
+  const tabs: {
+    key: Tab;
+    label: string;
+    icon: string;
+  }[] = [
+    {
+      key: "overview",
+      label: "Overview",
+      icon: "🩸",
+    },
+    {
+      key: "history",
+      label: "Donation History",
+      icon: "📋",
+    },
+    {
+      key: "requirements",
+      label: "Requirements",
+      icon: "📋",
+    },
   ];
+
+  // -------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bb-bg text-bb-text flex items-center justify-center">
+        <div className="text-center">
+          <div className="size-10 border-4 border-bb-border border-t-bb-crimson rounded-full animate-spin mx-auto mb-4" />
+
+          <p className="font-semibold text-bb-text">
+            Loading donor dashboard...
+          </p>
+
+          <p className="text-sm text-bb-muted mt-1">
+            Fetching your requests and profile.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------
+  // Main dashboard
+  // -------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-bb-bg text-bb-text flex flex-col">
-      {/* Header */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <header className="glass border-b border-bb-border sticky top-0 z-30">
         <div className="flex items-center justify-between px-4 sm:px-6 h-14">
+          {/* Left */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/")}
@@ -323,25 +660,20 @@ export default function DonorDashboard() {
                 />
               </svg>
             </button>
-            {/* Donor name + Logout */}
+
+            {/* Donor */}
             <div className="flex items-center gap-2">
               <div className="size-8 rounded-full bg-bb-indigo/10 border border-bb-indigo/30 flex items-center justify-center font-bold text-bb-indigo text-xs">
-                {donor.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
+                {initials}
               </div>
 
               <span className="hidden md:block text-sm font-medium text-bb-text">
-                {donor.name}
+                {donorName}
               </span>
 
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  navigate("/roles", { replace: true });
-                }}
+                onClick={handleLogout}
                 className="ml-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-bb-border text-bb-muted text-sm font-semibold hover:text-bb-crimson hover:border-bb-crimson/40 transition-colors"
                 aria-label="Logout"
               >
@@ -365,7 +697,7 @@ export default function DonorDashboard() {
             </div>
           </div>
 
-          {/* Tab navigation in header */}
+          {/* Desktop tabs */}
           <nav
             className="hidden sm:flex items-center gap-1"
             role="tablist"
@@ -388,7 +720,7 @@ export default function DonorDashboard() {
             ))}
           </nav>
 
-          {/* Availability pill */}
+          {/* Availability */}
           <div
             className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border cursor-pointer select-none"
             style={{
@@ -398,39 +730,33 @@ export default function DonorDashboard() {
             onClick={() => setShowAvailMenu(!showAvailMenu)}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) =>
-              e.key === "Enter" && setShowAvailMenu(!showAvailMenu)
-            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                setShowAvailMenu(!showAvailMenu);
+              }
+            }}
             aria-label={`Status: ${currentAvail.label}. Click to change.`}
           >
             <span
               className="size-2 rounded-full animate-blink"
-              style={{ background: currentAvail.color }}
+              style={{
+                background: currentAvail.color,
+              }}
               aria-hidden="true"
             />
+
             <span
               className="font-mono text-xs font-bold"
-              style={{ color: currentAvail.color }}
+              style={{
+                color: currentAvail.color,
+              }}
             >
               {currentAvail.label.toUpperCase()}
             </span>
           </div>
-
-          {/* Donor name */}
-          <div className="flex items-center gap-2">
-            <div className="size-8 rounded-full bg-bb-indigo/10 border border-bb-indigo/30 flex items-center justify-center font-bold text-bb-indigo text-xs">
-              {donor.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </div>
-            <span className="hidden md:block text-sm font-medium text-bb-text">
-              {donor.name}
-            </span>
-          </div>
         </div>
 
-        {/* Mobile tab bar */}
+        {/* Mobile tabs */}
         <div
           className="sm:hidden flex border-t border-bb-border"
           role="tablist"
@@ -454,62 +780,102 @@ export default function DonorDashboard() {
         </div>
       </header>
 
-      {/* Availability dropdown (portal-style, absolute) */}
+      {/* =====================================================
+          AVAILABILITY DROPDOWN
+      ===================================================== */}
+
       {showAvailMenu && (
         <div
           className="fixed top-16 right-4 z-50 glass rounded-xl shadow-lg w-56 border border-bb-border overflow-hidden animate-slide-up"
           role="menu"
         >
           {availabilityOptions
-            .filter((o) => o.key !== availability)
-            .map((opt) => (
+            .filter((option) => option.key !== availability)
+            .map((option) => (
               <button
-                key={opt.key}
+                key={option.key}
                 role="menuitem"
-                onClick={() => {
-                  setAvailability(opt.key);
-                  setShowAvailMenu(false);
-                }}
+                onClick={() => handleAvailabilityChange(option.key)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bb-surface transition-colors text-left border-b border-bb-border last:border-0"
               >
                 <span
                   className="font-bold text-lg"
-                  style={{ color: opt.color }}
+                  style={{
+                    color: option.color,
+                  }}
                 >
-                  {opt.icon}
+                  {option.icon}
                 </span>
+
                 <div>
                   <p className="text-sm font-semibold text-bb-text">
-                    {opt.label}
+                    {option.label}
                   </p>
-                  <p className="text-xs text-bb-muted">{opt.desc}</p>
+
+                  <p className="text-xs text-bb-muted">{option.desc}</p>
                 </div>
               </button>
             ))}
         </div>
       )}
 
-      {/* Content */}
+      {/* =====================================================
+          CONTENT
+      ===================================================== */}
+
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
-          {/* ─── OVERVIEW TAB ─── */}
+          {/* Error */}
+          {error && (
+            <div
+              className="rounded-xl border p-4"
+              style={{
+                borderColor: "rgba(192,24,50,0.35)",
+                background: "rgba(192,24,50,0.05)",
+              }}
+            >
+              <p className="font-semibold text-bb-crimson">
+                Unable to load dashboard
+              </p>
+
+              <p className="text-sm text-bb-muted mt-1">{error}</p>
+
+              <button
+                onClick={loadDashboard}
+                className="mt-3 px-4 py-2 rounded-lg bg-bb-crimson text-white text-sm font-semibold"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* =================================================
+              OVERVIEW
+          ================================================= */}
+
           {tab === "overview" && (
             <>
-              <h1 className="text-2xl font-bold text-bb-text">Your Impact</h1>
+              <div>
+                <h1 className="text-2xl font-bold text-bb-text">Your Impact</h1>
 
-              {/* Stats row */}
+                <p className="text-sm text-bb-muted mt-1">
+                  Thank you for being part of the blood donation network.
+                </p>
+              </div>
+
+              {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
                 {[
                   {
                     icon: "🩸",
                     label: "Blood Group",
-                    value: donor.bloodGroup,
+                    value: donorBloodGroup,
                     color: "#c01832",
                   },
                   {
                     icon: "❤️",
-                    label: "Responses",
-                    value: String(donor.responses),
+                    label: "Requests",
+                    value: String(donorRequests.length),
                     color: "#818cf8",
                   },
                   {
@@ -518,31 +884,36 @@ export default function DonorDashboard() {
                     value: "15 km",
                     color: "#00bfb3",
                   },
-                ].map((s) => (
+                ].map((stat) => (
                   <div
-                    key={s.label}
+                    key={stat.label}
                     className="rounded-2xl border border-bb-border bg-bb-surface p-4 text-center"
                   >
                     <p className="text-2xl mb-1" aria-hidden="true">
-                      {s.icon}
+                      {stat.icon}
                     </p>
+
                     <p
                       className="font-mono font-bold text-lg"
-                      style={{ color: s.color }}
+                      style={{
+                        color: stat.color,
+                      }}
                     >
-                      {s.value}
+                      {stat.value}
                     </p>
-                    <p className="text-xs text-bb-muted mt-0.5">{s.label}</p>
+
+                    <p className="text-xs text-bb-muted mt-0.5">{stat.label}</p>
                   </div>
                 ))}
               </div>
 
-              {/* Availability control */}
+              {/* Availability */}
               <section className="rounded-2xl border border-bb-border bg-bb-surface p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-bold text-bb-text">
                     Availability Status
                   </h2>
+
                   <button
                     onClick={() => setShowAvailMenu(!showAvailMenu)}
                     className="text-xs font-mono text-bb-muted hover:text-bb-text transition-colors border border-bb-border rounded-lg px-2.5 py-1 hover:border-bb-border-light bg-white"
@@ -550,6 +921,7 @@ export default function DonorDashboard() {
                     Change
                   </button>
                 </div>
+
                 <div
                   className="flex items-center gap-4 p-4 rounded-xl transition-all"
                   style={{
@@ -563,155 +935,249 @@ export default function DonorDashboard() {
                       background: `${currentAvail.color}15`,
                       border: `2px solid ${currentAvail.color}`,
                     }}
-                    aria-hidden="true"
                   >
                     <span
                       className="animate-blink"
-                      style={{ color: currentAvail.color }}
+                      style={{
+                        color: currentAvail.color,
+                      }}
                     >
                       {currentAvail.icon}
                     </span>
                   </div>
+
                   <div>
                     <p
                       className="font-bold text-lg"
-                      style={{ color: currentAvail.color }}
+                      style={{
+                        color: currentAvail.color,
+                      }}
                     >
                       {currentAvail.label}
                     </p>
+
                     <p className="text-sm text-bb-muted">{currentAvail.desc}</p>
                   </div>
                 </div>
               </section>
 
-              {/* Incoming request alert */}
-              {showRequest &&
-                availability === "AVAILABLE" &&
-                requestResponse === "pending" && (
-                  <section
-                    className="rounded-2xl p-5 border animate-slide-up"
-                    style={{
-                      borderColor: "rgba(192,24,50,0.35)",
-                      background: "rgba(192,24,50,0.04)",
-                    }}
-                    role="alert"
-                    aria-live="assertive"
-                  >
-                    <div className="flex items-center gap-2 mb-4">
-                      <span
-                        className="size-2 rounded-full bg-bb-crimson animate-blink"
-                        aria-hidden="true"
-                      />
-                      <p className="font-mono text-xs font-bold tracking-widest text-bb-crimson uppercase">
-                        Verified Hospital Request
-                      </p>
-                    </div>
+              {/* =================================================
+                  PENDING REQUESTS
+              ================================================= */}
 
-                    <div className="flex items-start gap-4 mb-4">
-                      <div
-                        className="size-14 rounded-2xl flex items-center justify-center font-mono font-bold text-bb-crimson text-sm shrink-0"
-                        style={{
-                          background: "rgba(192,24,50,0.10)",
-                          border: "1px solid rgba(192,24,50,0.30)",
-                        }}
-                      >
-                        {incomingRequest.bloodGroup}
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-bb-text">
-                            Blood Required
-                          </span>
-                          <UrgencyBadge urgency={incomingRequest.urgency} />
-                        </div>
-                        <p className="text-sm text-bb-muted">
-                          {incomingRequest.hospital}
-                        </p>
-                        <div className="flex gap-4 font-mono text-xs text-bb-muted">
-                          <span>📍 {incomingRequest.distance} km away</span>
-                          <span>🕐 {incomingRequest.postedAt}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className="rounded-xl border p-3 mb-4"
+              {availability === "AVAILABLE" && pendingRequests.length > 0 && (
+                <section className="space-y-4">
+                  {pendingRequests.map((request) => (
+                    <section
+                      key={request.id}
+                      className="rounded-2xl p-5 border animate-slide-up"
                       style={{
-                        background: "rgba(129,140,248,0.08)",
-                        borderColor: "rgba(129,140,248,0.25)",
+                        borderColor: "rgba(192,24,50,0.35)",
+                        background: "rgba(192,24,50,0.04)",
                       }}
+                      role="alert"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-bb-indigo font-semibold">
-                          Your Match Score
-                        </p>
-                        <p className="font-mono font-bold text-bb-indigo text-xl">
-                          {incomingRequest.matchScore}%
-                        </p>
-                      </div>
-                      <div className="mt-2 progress-bar">
-                        <div
-                          className="progress-fill bg-bb-indigo"
-                          style={{ width: `${incomingRequest.matchScore}%` }}
+                      <div className="flex items-center gap-2 mb-4">
+                        <span
+                          className="size-2 rounded-full bg-bb-crimson animate-blink"
+                          aria-hidden="true"
                         />
-                      </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleAccept}
-                        className="flex-1 py-3 rounded-xl font-bold text-sm transition-colors"
+                        <p className="font-mono text-xs font-bold tracking-widest text-bb-crimson uppercase">
+                          Verified Hospital Request
+                        </p>
+                      </div>
+
+                      <div className="flex items-start gap-4 mb-4">
+                        <div
+                          className="size-14 rounded-2xl flex items-center justify-center font-mono font-bold text-bb-crimson text-sm shrink-0"
+                          style={{
+                            background: "rgba(192,24,50,0.10)",
+                            border: "1px solid rgba(192,24,50,0.30)",
+                          }}
+                        >
+                          {request.blood_group}
+                        </div>
+
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-bb-text">
+                              Blood Required
+                            </span>
+
+                            {request.urgency && (
+                              <UrgencyBadge urgency={request.urgency as any} />
+                            )}
+                          </div>
+
+                          <p className="text-sm text-bb-muted">
+                            {request.hospital_name ?? "Hospital"}
+                          </p>
+
+                          {request.patient_reference && (
+                            <p className="text-xs text-bb-muted">
+                              Patient: {request.patient_reference}
+                            </p>
+                          )}
+
+                          <div className="flex gap-4 flex-wrap font-mono text-xs text-bb-muted">
+                            <span>📍 {request.distance} km away</span>
+
+                            <span>
+                              🩸 {request.units_required ?? "—"} unit
+                              {request.units_required === 1 ? "" : "s"}
+                            </span>
+
+                            <span>
+                              🕐 {new Date(request.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Match score */}
+                      <div
+                        className="rounded-xl border p-3 mb-4"
                         style={{
-                          background: "rgba(0,191,179,0.12)",
-                          border: "1px solid rgba(0,191,179,0.40)",
-                          color: "#00bfb3",
+                          background: "rgba(129,140,248,0.08)",
+                          borderColor: "rgba(129,140,248,0.25)",
                         }}
                       >
-                        I Can Help
-                      </button>
-                      <button
-                        onClick={handleDecline}
-                        className="flex-1 py-3 rounded-xl border border-bb-border text-bb-muted font-semibold text-sm hover:text-bb-text hover:border-bb-border-light transition-colors bg-white"
-                      >
-                        Not Available
-                      </button>
-                    </div>
-                  </section>
-                )}
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-bb-indigo font-semibold">
+                            Your Match Score
+                          </p>
 
-              {requestResponse === "accepted" && (
-                <div
-                  className="rounded-2xl p-5 border text-center animate-slide-up"
-                  style={{
-                    borderColor: "rgba(0,191,179,0.35)",
-                    background: "rgba(0,191,179,0.06)",
-                  }}
-                >
-                  <div
-                    className="size-12 rounded-full flex items-center justify-center mx-auto mb-3"
-                    style={{
-                      background: "rgba(0,191,179,0.15)",
-                      border: "1px solid rgba(0,191,179,0.40)",
-                    }}
-                  >
+                          <p className="font-mono font-bold text-bb-indigo text-xl">
+                            {request.match_score}%
+                          </p>
+                        </div>
+
+                        <div className="mt-2 progress-bar">
+                          <div
+                            className="progress-fill bg-bb-indigo"
+                            style={{
+                              width: `${Math.min(
+                                Math.max(request.match_score, 0),
+                                100,
+                              )}%`,
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between mt-2 text-xs text-bb-muted">
+                          <span>Distance: {request.distance} km</span>
+
+                          <span>Trust: {request.trust_score}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAccept(request.id)}
+                          disabled={requestLoading === request.id}
+                          className="flex-1 py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-50"
+                          style={{
+                            background: "rgba(0,191,179,0.12)",
+                            border: "1px solid rgba(0,191,179,0.40)",
+                            color: "#00bfb3",
+                          }}
+                        >
+                          {requestLoading === request.id
+                            ? "Processing..."
+                            : "I Can Help"}
+                        </button>
+
+                        <button
+                          onClick={() => handleDecline(request.id)}
+                          disabled={requestLoading === request.id}
+                          className="flex-1 py-3 rounded-xl border border-bb-border text-bb-muted font-semibold text-sm hover:text-bb-text hover:border-bb-border-light transition-colors bg-white disabled:opacity-50"
+                        >
+                          Not Available
+                        </button>
+                      </div>
+                    </section>
+                  ))}
+                </section>
+              )}
+
+              {/* No pending requests */}
+              {availability === "AVAILABLE" && pendingRequests.length === 0 && (
+                <section className="rounded-2xl border border-bb-border bg-bb-surface p-6 text-center">
+                  <div className="size-12 rounded-full bg-bb-green/10 border border-bb-green/25 flex items-center justify-center mx-auto mb-3">
                     <svg
-                      className="size-6 text-bb-teal"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
+                      className="size-6 text-bb-green"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
                       <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
                       />
                     </svg>
                   </div>
-                  <p className="font-bold text-bb-teal">Response Recorded</p>
+
+                  <p className="font-bold text-bb-text">No pending requests</p>
+
                   <p className="text-sm text-bb-muted mt-1">
-                    Apollo Hospitals has been notified of your response.
+                    You're available and ready to help when a compatible request
+                    arrives.
                   </p>
-                </div>
+                </section>
+              )}
+
+              {/* Busy / unavailable */}
+              {availability !== "AVAILABLE" && (
+                <section className="rounded-2xl border border-bb-border bg-bb-surface p-6 text-center">
+                  <div className="size-12 rounded-full bg-bb-amber/10 border border-bb-amber/25 flex items-center justify-center mx-auto mb-3 text-xl">
+                    {currentAvail.icon}
+                  </div>
+
+                  <p className="font-bold text-bb-text">
+                    You are currently {currentAvail.label.toLowerCase()}
+                  </p>
+
+                  <p className="text-sm text-bb-muted mt-1">
+                    Change your availability to Available to respond to blood
+                    requests.
+                  </p>
+                </section>
+              )}
+
+              {/* Request summary */}
+              {donorRequests.length > 0 && (
+                <section className="rounded-2xl border border-bb-border bg-bb-surface p-5">
+                  <h2 className="font-bold text-bb-text mb-4">
+                    Request Summary
+                  </h2>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center">
+                      <p className="font-mono text-xl font-bold text-bb-amber">
+                        {pendingRequests.length}
+                      </p>
+                      <p className="text-xs text-bb-muted">Pending</p>
+                    </div>
+
+                    <div className="text-center">
+                      <p className="font-mono text-xl font-bold text-bb-green">
+                        {acceptedRequests.length}
+                      </p>
+                      <p className="text-xs text-bb-muted">Accepted</p>
+                    </div>
+
+                    <div className="text-center">
+                      <p className="font-mono text-xl font-bold text-bb-crimson">
+                        {declinedRequests.length}
+                      </p>
+                      <p className="text-xs text-bb-muted">Declined</p>
+                    </div>
+                  </div>
+                </section>
               )}
 
               {/* Next eligibility */}
@@ -732,14 +1198,17 @@ export default function DonorDashboard() {
                   >
                     📅
                   </div>
+
                   <div>
                     <p className="font-semibold text-bb-text">
-                      Next Eligible to Donate
+                      Donation Eligibility
                     </p>
+
                     <p className="font-mono text-xs text-bb-amber mt-0.5">
-                      August 15, 2024 · 90-day interval
+                      Based on your last recorded donation
                     </p>
                   </div>
+
                   <button
                     onClick={() => setTab("requirements")}
                     className="ml-auto text-xs text-bb-muted hover:text-bb-text transition-colors underline underline-offset-2"
@@ -751,7 +1220,10 @@ export default function DonorDashboard() {
             </>
           )}
 
-          {/* ─── DONATION HISTORY TAB ─── */}
+          {/* =================================================
+              DONATION HISTORY
+          ================================================= */}
+
           {tab === "history" && (
             <>
               <div className="flex items-center justify-between">
@@ -759,50 +1231,68 @@ export default function DonorDashboard() {
                   <h1 className="text-2xl font-bold text-bb-text">
                     Donation History
                   </h1>
+
                   <p className="text-sm text-bb-muted mt-0.5">
                     {donorHistory.length} donations recorded
                   </p>
                 </div>
+
                 <div className="text-right">
                   <p className="font-mono text-2xl font-bold text-bb-crimson">
-                    {donorHistory.length}
+                    {donationCount}
                   </p>
+
                   <p className="text-xs text-bb-muted">Total Donations</p>
                 </div>
               </div>
 
-              {/* Summary stats */}
+              {/* Summary */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "This Year", value: "2", color: "#00bfb3" },
-                  { label: "Last Year", value: "2", color: "#818cf8" },
+                  {
+                    label: "This Year",
+                    value: "2",
+                    color: "#00bfb3",
+                  },
+                  {
+                    label: "Last Year",
+                    value: "2",
+                    color: "#818cf8",
+                  },
                   {
                     label: "All Time",
-                    value: String(donorHistory.length),
+                    value: String(donationCount),
                     color: "#c01832",
                   },
-                ].map((s) => (
+                ].map((stat) => (
                   <div
-                    key={s.label}
+                    key={stat.label}
                     className="rounded-xl border border-bb-border bg-bb-surface p-3 text-center"
                   >
                     <p
                       className="font-mono font-bold text-xl"
-                      style={{ color: s.color }}
+                      style={{
+                        color: stat.color,
+                      }}
                     >
-                      {s.value}
+                      {stat.value}
                     </p>
-                    <p className="text-xs text-bb-muted mt-0.5">{s.label}</p>
+
+                    <p className="text-xs text-bb-muted mt-0.5">{stat.label}</p>
                   </div>
                 ))}
               </div>
 
-              {/* History list */}
+              {/* History */}
               <div className="rounded-2xl border border-bb-border bg-white overflow-hidden">
-                {donorHistory.map((d, i) => (
+                {donorHistory.map((donation, index) => (
                   <div
-                    key={i}
-                    className={`flex items-center gap-4 px-5 py-4 ${i < donorHistory.length - 1 ? "border-b border-bb-border" : ""}`}
+                    key={index}
+                    className={`flex items-center gap-4 px-5 py-4 ${
+                      index < donorHistory.length - 1
+                        ? "border-b border-bb-border"
+                        : ""
+                    }`}
                   >
                     <div
                       className="size-10 rounded-full flex items-center justify-center shrink-0"
@@ -819,24 +1309,30 @@ export default function DonorDashboard() {
                       >
                         <path
                           fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 00-1.414-1.414z"
                           clipRule="evenodd"
                         />
                       </svg>
                     </div>
+
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-bb-text text-sm truncate">
-                        {d.hospital}
+                        {donation.hospital}
                       </p>
+
                       <p className="text-xs text-bb-muted">
-                        {d.city} · {d.date}
+                        {donation.city} · {donation.date}
                       </p>
                     </div>
+
                     <div className="text-right shrink-0">
                       <span className="inline-block font-mono text-xs font-bold text-bb-crimson bg-bb-crimson/10 border border-bb-crimson/25 rounded-full px-2 py-0.5">
-                        {d.group}
+                        {donation.group}
                       </span>
-                      <p className="text-xs text-bb-green mt-1">{d.status}</p>
+
+                      <p className="text-xs text-bb-green mt-1">
+                        {donation.status}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -845,11 +1341,13 @@ export default function DonorDashboard() {
               {/* CTA */}
               <div className="rounded-2xl border border-bb-border bg-bb-surface p-5 text-center">
                 <p className="text-sm text-bb-muted">Ready to donate again?</p>
+
                 <p className="font-mono text-xs text-bb-amber mt-1">
-                  Next eligible: August 15, 2024
+                  Check your eligibility before donating.
                 </p>
+
                 <button
-                  onClick={() => setTab("overview")}
+                  onClick={() => setTab("requirements")}
                   className="mt-3 px-5 py-2 rounded-xl text-sm font-semibold transition-colors"
                   style={{
                     background: "rgba(192,24,50,0.10)",
@@ -857,30 +1355,35 @@ export default function DonorDashboard() {
                     color: "#c01832",
                   }}
                 >
-                  View Incoming Requests
+                  View Requirements
                 </button>
               </div>
             </>
           )}
 
-          {/* ─── REQUIREMENTS TAB ─── */}
+          {/* =================================================
+              REQUIREMENTS
+          ================================================= */}
+
           {tab === "requirements" && (
             <>
               <div>
                 <h1 className="text-2xl font-bold text-bb-text">
                   Donation Requirements
                 </h1>
+
                 <p className="text-sm text-bb-muted mt-1">
                   Review these eligibility criteria before each donation.
                   Requirements may vary slightly by location.
                 </p>
               </div>
 
-              {/* Quick checklist */}
+              {/* Checklist */}
               <div className="rounded-2xl border border-bb-border bg-bb-surface p-5">
                 <p className="text-xs font-semibold uppercase tracking-widest text-bb-muted mb-3">
                   Quick Eligibility Checklist
                 </p>
+
                 <div className="grid sm:grid-cols-2 gap-2">
                   {[
                     "Age 18–65 years",
@@ -904,43 +1407,52 @@ export default function DonorDashboard() {
                       >
                         <path
                           fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0L3.293 10.293a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                           clipRule="evenodd"
                         />
                       </svg>
+
                       {item}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Detailed categories — accordion */}
+              {/* Categories */}
               <div className="space-y-3">
-                {requirementCategories.map((cat) => {
-                  const isOpen = openCategory === cat.title;
+                {requirementCategories.map((category) => {
+                  const isOpen = openCategory === category.title;
+
                   return (
                     <div
-                      key={cat.title}
+                      key={category.title}
                       className="rounded-2xl border overflow-hidden transition-all"
-                      style={{ borderColor: isOpen ? cat.border : "#e2e8f0" }}
+                      style={{
+                        borderColor: isOpen ? category.border : "#e2e8f0",
+                      }}
                     >
                       <button
                         onClick={() =>
-                          setOpenCategory(isOpen ? null : cat.title)
+                          setOpenCategory(isOpen ? null : category.title)
                         }
                         className="w-full flex items-center gap-3 px-5 py-4 text-left"
-                        style={{ background: isOpen ? cat.bg : "white" }}
+                        style={{
+                          background: isOpen ? category.bg : "white",
+                        }}
                         aria-expanded={isOpen}
                       >
                         <span className="text-xl shrink-0" aria-hidden="true">
-                          {cat.icon}
+                          {category.icon}
                         </span>
+
                         <span className="flex-1 font-semibold text-bb-text">
-                          {cat.title}
+                          {category.title}
                         </span>
+
                         <span className="font-mono text-xs text-bb-muted shrink-0">
-                          {cat.rules.length} rules
+                          {category.rules.length} rules
                         </span>
+
                         <svg
                           className="size-4 text-bb-muted shrink-0 transition-transform"
                           style={{
@@ -965,27 +1477,32 @@ export default function DonorDashboard() {
                       {isOpen && (
                         <div
                           className="border-t px-5 pb-4 pt-3 space-y-3 animate-slide-up bg-white"
-                          style={{ borderColor: cat.border }}
+                          style={{
+                            borderColor: category.border,
+                          }}
                         >
-                          {cat.rules.map((rule) => (
+                          {category.rules.map((rule) => (
                             <div key={rule.label} className="flex gap-3">
                               <div
                                 className="mt-0.5 size-5 rounded-full shrink-0 flex items-center justify-center"
                                 style={{
-                                  background: cat.bg,
-                                  border: `1px solid ${cat.border}`,
+                                  background: category.bg,
+                                  border: `1px solid ${category.border}`,
                                 }}
-                                aria-hidden="true"
                               >
                                 <span
                                   className="size-1.5 rounded-full"
-                                  style={{ background: cat.color }}
+                                  style={{
+                                    background: category.color,
+                                  }}
                                 />
                               </div>
+
                               <div>
                                 <p className="text-sm font-semibold text-bb-text">
                                   {rule.label}
                                 </p>
+
                                 <p className="text-xs text-bb-muted leading-relaxed mt-0.5">
                                   {rule.detail}
                                 </p>
@@ -1014,7 +1531,10 @@ export default function DonorDashboard() {
         </div>
       </div>
 
-      {/* Toast */}
+      {/* =====================================================
+          TOAST
+      ===================================================== */}
+
       {toast && (
         <div
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-semibold animate-slide-up shadow-lg border"

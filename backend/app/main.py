@@ -6,7 +6,8 @@ from app.routers.auth import router as auth_router
 from app.routers.blood_banks import router as blood_bank_router
 from app.routers import blood_bank_reservations
 from app.routers.donor_matching import router as donor_matching_router
-
+from app.routers import donor_requests
+from app.routers import users
 app = FastAPI(
     title="BloodBridge API",
     version="1.0.0"
@@ -32,6 +33,8 @@ app.include_router(
     blood_bank_reservations.router
 )
 app.include_router(donor_matching_router)
+app.include_router(donor_requests.router)
+app.include_router(users.router)
 @app.get("/")
 async def root():
     return {
