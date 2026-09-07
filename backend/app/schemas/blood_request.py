@@ -54,6 +54,8 @@ class DonorMatchResponse(BaseModel):
 
     donation_count: int
 
+    last_donation: datetime | None = None
+
     status: str
 
 
@@ -61,6 +63,8 @@ class BloodRequestResponse(BaseModel):
     id: str
 
     hospital_id: str
+
+    hospital_name: str | None = None
 
     patient_reference: str
 
@@ -78,6 +82,9 @@ class BloodRequestResponse(BaseModel):
 
     remaining_units: int
 
+    notes: str | None = None
+
     created_at: datetime
 
     donors: list[DonorMatchResponse] = Field(default_factory=list)
+

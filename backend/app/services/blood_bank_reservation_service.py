@@ -13,14 +13,44 @@ from app.services.donor_matching_service import (
 # SERIALIZE RESERVATION
 # =========================================================
 
-def serialize_reservation(
+async def serialize_reservation(
     reservation: dict,
 ) -> dict:
+    hospital_name = reservation.get("hospital_name")
+    urgency = reservation.get("urgency")
+
+    if not hospital_name or not urgency:
+        try:
+            req = await db.blood_requests.find_one(
+                {"_id": ObjectId(reservation["request_id"])}
+            )
+            if req:
+                if not hospital_name:
+                    hospital_name = req.get("hospital_name")
+                if not urgency:
+                    urgency = req.get("urgency")
+        except Exception:
+            pass
+
+        if not hospital_name:
+            try:
+                hospital = await db.users.find_one(
+                    {"_id": ObjectId(reservation["hospital_id"])}
+                )
+                if hospital:
+                    hospital_name = hospital.get(
+                        "hospitalName", hospital.get("name")
+                    )
+            except Exception:
+                pass
+
     return {
         "id": str(reservation["_id"]),
         "request_id": reservation["request_id"],
         "blood_bank_id": reservation["blood_bank_id"],
         "hospital_id": reservation["hospital_id"],
+        "hospital_name": hospital_name,
+        "urgency": urgency,
         "blood_group": reservation["blood_group"],
         "units_requested": reservation["units_requested"],
         "units_confirmed": reservation.get(
@@ -56,7 +86,7 @@ async def get_blood_bank_reservations(
 
     async for reservation in cursor:
         reservations.append(
-            serialize_reservation(
+            await serialize_reservation(
                 reservation
             )
         )
@@ -544,8 +574,9 @@ async def respond_to_reservation(
     )
 
     return (
-        serialize_reservation(
+        await serialize_reservation(
             updated_reservation
         ),
         None,
     )
+

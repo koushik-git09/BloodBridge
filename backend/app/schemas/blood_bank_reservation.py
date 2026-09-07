@@ -13,6 +13,10 @@ class BloodBankReservationResponse(BaseModel):
 
     hospital_id: str
 
+    hospital_name: str | None = None
+
+    urgency: str | None = None
+
     blood_group: str
 
     units_requested: int

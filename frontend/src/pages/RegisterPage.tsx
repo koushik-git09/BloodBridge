@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { register } from "../services/authService";
 import type { BloodGroup, Role } from "../types";
+import LocationPicker from "../components/common/LocationPicker";
 
 const roleNames: Record<Role, string> = {
   HOSPITAL: "Hospital",
@@ -23,11 +24,17 @@ export default function RegisterPage() {
     email: "",
     phone: "",
     password: "",
-    latitude: "",
-    longitude: "",
-    address: "",
     bloodGroup: "",
     hospitalName: "",
+  });
+  const [location, setLocation] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+    address: string;
+  }>({
+    latitude: null,
+    longitude: null,
+    address: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,9 +43,24 @@ export default function RegisterPage() {
   if (!role) return <Navigate to="/roles" replace />;
   const loginPath = `/login/${role === "BLOOD_BANK" ? "blood-bank" : role.toLowerCase()}`;
 
+  const handleLocationChange = (loc: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  }) => {
+    setLocation(loc);
+    setError("");
+  };
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+
+    if (location.latitude === null || location.longitude === null) {
+      setError("Please click 'Use My Current Location' to enable location detection.");
+      return;
+    }
+
     setLoading(true);
     try {
       await register({
@@ -48,9 +70,9 @@ export default function RegisterPage() {
         password: form.password,
         role,
         location: {
-          latitude: Number(form.latitude),
-          longitude: Number(form.longitude),
-          address: form.address,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
         },
         ...(role === "DONOR" ? { bloodGroup: form.bloodGroup } : {}),
         ...(role === "HOSPITAL" ? { hospitalName: form.hospitalName } : {}),
@@ -66,6 +88,7 @@ export default function RegisterPage() {
       setLoading(false);
     }
   }
+
 
   const input = (field: keyof typeof form, label: string, type = "text") => (
     <label className="block text-sm font-semibold text-bb-text">
@@ -149,11 +172,7 @@ export default function RegisterPage() {
                 </select>
               </label>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              {input("latitude", "Latitude", "number")}
-              {input("longitude", "Longitude", "number")}
-            </div>
-            {input("address", "Address / City")}
+            <LocationPicker onLocationChange={handleLocationChange} />
             <button
               type="submit"
               disabled={loading}

@@ -14,6 +14,8 @@ export interface BloodBankReservationResponse {
   request_id: string;
   blood_bank_id: string;
   hospital_id: string;
+  hospital_name?: string | null;
+  urgency?: string | null;
   blood_group: BloodGroup;
   units_requested: number;
   units_confirmed: number;

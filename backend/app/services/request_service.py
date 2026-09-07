@@ -92,6 +92,8 @@ async def serialize_request(
                 0,
             ),
 
+            "last_donation": donor.get("lastDonation"),
+
             "status": match.get("status", "PENDING"),
         })
 
@@ -121,6 +123,7 @@ async def serialize_request(
                 "match_score": match["match_score"],
                 "trust_score": match["trust_score"],
                 "donation_count": donor.get("donationCount", 0),
+                "last_donation": donor.get("lastDonation"),
                 "status": match.get("status", "PENDING"),
             })
 

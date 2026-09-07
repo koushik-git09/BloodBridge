@@ -4,13 +4,24 @@ from typing import Literal
 from bson import ObjectId
 
 from app.database.mongodb import db
-from app.dependencies.auth import require_role
+from app.dependencies.auth import require_role, get_current_user
 
 
 router = APIRouter(
     prefix="/api/users",
     tags=["Users"],
 )
+
+
+@router.get("/me")
+async def get_my_user(
+    current_user=Depends(get_current_user),
+):
+    """
+    Get the currently logged-in user's profile.
+    """
+    return current_user
+
 
 
 class AvailabilityUpdate(BaseModel):
