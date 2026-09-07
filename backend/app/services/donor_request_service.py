@@ -190,8 +190,7 @@ async def respond_to_donor_request(
 
     del updated_request["_id"]
 
-    return updated_request, None
-        # Keep the hospital-facing donor match synchronized
+    # Keep the hospital-facing donor match synchronized
     await db.donor_matches.update_one(
         {
             "request_id": donor_request["request_id"],
@@ -206,6 +205,10 @@ async def respond_to_donor_request(
             }
         },
     )
+
+    return updated_request, None
+
+
 async def confirm_donor_donation(
     donor_request_id: str,
     request_id: str,

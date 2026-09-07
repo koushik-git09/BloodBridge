@@ -47,3 +47,17 @@ export async function respondToDonorRequest(
     },
   );
 }
+
+/**
+ * Get donation history for the logged-in donor.
+ */
+export async function getDonorDonationHistory() {
+  return apiRequest<import("../types").DonationRecord[]>("/api/donors/me/donations");
+}
+
+/**
+ * Get donation statistics for the logged-in donor.
+ */
+export async function getDonorStatistics() {
+  return apiRequest<import("../types").DonorStatistics>("/api/donors/me/statistics");
+}

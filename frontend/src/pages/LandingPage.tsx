@@ -15,9 +15,9 @@ const steps = [
     color: "#00bfb3",
   },
   {
-    icon: "🤖",
+    icon: "⚡",
     label: "SMART MATCHING",
-    desc: "AI engine ranks eligible donors by compatibility",
+    desc: "Algorithmic engine ranks eligible donors by compatibility and proximity",
     color: "#818cf8",
   },
   {

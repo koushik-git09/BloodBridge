@@ -12,6 +12,8 @@ __pycache__/
 # Python environment variables
 backend/.env
 .env
+backend/.venv/
+.venv/
 
 # =========================
 # Node.js

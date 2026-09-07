@@ -85,3 +85,23 @@ export interface Notification {
   time: string;
   read: boolean;
 }
+
+export interface DonationRecord {
+  id: string;
+  donor_id: string;
+  request_id: string;
+  hospital_id: string;
+  hospital_name?: string | null;
+  blood_group: BloodGroup;
+  units: number;
+  donated_at: string;
+  status: string;
+}
+
+export interface DonorStatistics {
+  total_donations: number;
+  total_units: number;
+  last_donation: string | null;
+  trust_score: number;
+}
+
