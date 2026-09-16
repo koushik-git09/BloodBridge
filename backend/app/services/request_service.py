@@ -208,15 +208,8 @@ async def create_blood_request(
         "updated_at": datetime.now(timezone.utc),
     }
 
-    result = await db.blood_requests.insert_one(
-        request_document
-    )
-
+    result = await db.blood_requests.insert_one(request_document)
     request_document["_id"] = result.inserted_id
-
-    # -----------------------------------------------------
-    # AUTOMATIC BLOOD BANK MATCHING
-    # -----------------------------------------------------
 
     hospital = await db.users.find_one({
         "_id": ObjectId(hospital_user["id"]),
@@ -224,24 +217,35 @@ async def create_blood_request(
     })
 
     if hospital and hospital.get("location"):
-
-        await create_blood_bank_reservations(
+        reservations = await create_blood_bank_reservations(
             request_id=str(result.inserted_id),
             hospital_id=hospital_user["id"],
             blood_group=request_data.blood_group,
             units_required=request_data.units_required,
             hospital_location=hospital["location"],
         )
-        await create_donor_requests_for_blood_request(
-        request_id=str(result.inserted_id),
-        hospital_id=hospital_user["id"],
-        blood_group=request_data.blood_group,
-        hospital_location=hospital["location"],
-        )
 
-    return await serialize_request(
-    request_document
-)
+        requested_from_banks = sum(r["units_requested"] for r in reservations)
+        likely_shortfall = request_data.units_required - requested_from_banks
+
+        new_status = "CHECKING_BLOOD_BANK" if reservations else "DONOR_MATCHING"
+
+        await db.blood_requests.update_one(
+            {"_id": result.inserted_id},
+            {"$set": {"status": new_status}}
+        )
+        request_document["status"] = new_status
+
+        if likely_shortfall > 0:
+            await create_donor_requests_for_blood_request(
+                request_id=str(result.inserted_id),
+                hospital_id=hospital_user["id"],
+                blood_group=request_data.blood_group,
+                hospital_location=hospital["location"],
+            )
+
+    return await serialize_request(request_document)
+
 async def get_request_by_id(request_id: str):
 
     try:

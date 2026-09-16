@@ -117,14 +117,16 @@ async def get_reservation_by_id(
 # RUN DONOR MATCHING
 # =========================================================
 
+from app.services.donor_request_service import (
+    create_donor_requests_for_blood_request,
+)
+
 async def run_donor_matching_for_request(
     request: dict,
 ):
     """
-    Find and persist donor matches for a blood request.
-
-    Existing donor matches for the same request are
-    preserved so we don't create duplicates.
+    Find and persist donor requests for a blood request's
+    remaining unfulfilled units.
     """
 
     remaining_units = max(
@@ -140,9 +142,7 @@ async def run_donor_matching_for_request(
     try:
         hospital = await db.users.find_one(
             {
-                "_id": ObjectId(
-                    request["hospital_id"]
-                ),
+                "_id": ObjectId(request["hospital_id"]),
                 "role": "HOSPITAL",
             }
         )
@@ -152,118 +152,17 @@ async def run_donor_matching_for_request(
     if not hospital:
         return []
 
-    hospital_location = hospital.get(
-        "location"
-    )
+    hospital_location = hospital.get("location")
 
     if not hospital_location:
         return []
 
-    # -----------------------------------------------------
-    # Find top 10 real donors
-    # -----------------------------------------------------
-
-    donors = await find_matching_donors(
-        request_id=str(
-            request["_id"]
-        ),
+    return await create_donor_requests_for_blood_request(
+        request_id=str(request["_id"]),
+        hospital_id=request["hospital_id"],
         blood_group=request["blood_group"],
         hospital_location=hospital_location,
-        limit=10,
     )
-
-    # -----------------------------------------------------
-    # Save donor matches
-    # -----------------------------------------------------
-
-    saved_matches = []
-    existing_match_count = await db.donor_matches.count_documents(
-        {
-            "request_id": str(request["_id"]),
-        }
-    )
-
-    for donor in donors:
-
-        if existing_match_count >= 10:
-            break
-
-        # Don't create duplicate matches
-        existing_match = (
-            await db.donor_matches.find_one(
-                {
-                    "request_id": str(
-                        request["_id"]
-                    ),
-                    "donor_id": donor["donor_id"],
-                }
-            )
-        )
-
-        if existing_match:
-            saved_matches.append(
-                existing_match
-            )
-            continue
-
-        match_document = {
-            "request_id": str(
-                request["_id"]
-            ),
-
-            "donor_id": donor["donor_id"],
-
-            "hospital_id": request[
-                "hospital_id"
-            ],
-
-            "blood_group": donor[
-                "blood_group"
-            ],
-
-            "distance": donor[
-                "distance"
-            ],
-
-            "match_score": donor[
-                "match_score"
-            ],
-
-            "trust_score": donor[
-                "trust_score"
-            ],
-
-            "donation_count": donor[
-                "donation_count"
-            ],
-
-            "availability": donor[
-                "availability"
-            ],
-
-            "status": "PENDING",
-
-            "created_at": datetime.now(
-                timezone.utc
-            ),
-
-            "responded_at": None,
-        }
-
-        result = await db.donor_matches.insert_one(
-            match_document
-        )
-
-        match_document["_id"] = (
-            result.inserted_id
-        )
-
-        saved_matches.append(
-            match_document
-        )
-        existing_match_count += 1
-
-    return saved_matches
 
 
 # =========================================================
