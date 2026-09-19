@@ -39,6 +39,10 @@ app.include_router(users.router)
 app.include_router(
     donations.router
 )
+app.include_router(
+    donations.donations_router
+)
+
 @app.get("/")
 async def root():
     return {

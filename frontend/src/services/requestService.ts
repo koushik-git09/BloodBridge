@@ -11,7 +11,9 @@ export interface DonorMatchResponse {
   match_score: number;
   trust_score: number;
   donation_count: number;
+  last_donation?: string | null;
   status: "PENDING" | "ACCEPTED" | "DECLINED" | "DONATED";
+  phone?: string | null;
 }
 
 export interface BloodRequestResponse {

@@ -4,6 +4,8 @@ import LandingPage from "./pages/LandingPage";
 import RoleSelectorPage from "./pages/RoleSelectorPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 import HospitalDashboard from "./pages/HospitalDashboard";
 import BloodBankDashboard from "./pages/BloodBankDashboard";
@@ -40,6 +42,22 @@ export default function App() {
           path="/register/:role"
           element={<RegisterPage />}
         />
+
+        <Route
+          path="/forgot-password"
+          element={<ForgotPasswordPage />}
+        />
+
+        <Route
+          path="/forgot-password/:role"
+          element={<ForgotPasswordPage />}
+        />
+
+        <Route
+          path="/reset-password"
+          element={<ResetPasswordPage />}
+        />
+
 
 
         {/* ================= PROTECTED DASHBOARDS ================= */}

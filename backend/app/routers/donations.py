@@ -38,3 +38,22 @@ async def get_my_statistics(
     return await get_donor_statistics(
         current_user["id"]
     )
+
+
+donations_router = APIRouter(
+    prefix="/api/donations",
+    tags=["Donations"],
+)
+
+
+@donations_router.get(
+    "/me",
+)
+async def get_my_donations_alias(
+    current_user=Depends(
+        require_role("DONOR")
+    ),
+):
+    return await get_donor_donation_history(
+        current_user["id"]
+    )

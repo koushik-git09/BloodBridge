@@ -59,10 +59,16 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
             </div>
             <div>
               <p className="font-semibold text-bb-text">{donor.name}</p>
-              <div className="mt-0.5 flex items-center gap-2">
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
                 <BloodGroupBadge group={donor.bloodGroup} size="sm" />
                 <span className="font-mono text-xs text-bb-muted">{donor.distance} km away</span>
+                {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    📱 {donor.phone}
+                  </span>
+                )}
               </div>
+
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -90,6 +96,29 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
             <span className="text-bb-border">·</span>
             <span>{donor.responses} responses</span>
           </div>
+
+          {/* Donor Mobile Contact Section (Visible ONLY after Donor accepts) */}
+          {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
+            <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 p-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                  Verified Donor Contact
+                </p>
+                <p className="text-xs font-mono font-bold text-slate-900 mt-0.5">
+                  Mobile: <span className="text-bb-text font-bold">{donor.phone}</span>
+                </p>
+              </div>
+              <a
+                href={`tel:${donor.phone}`}
+                onClick={(event) => event.stopPropagation()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition active:scale-95"
+              >
+                <span>📞</span>
+                <span>Contact Donor</span>
+              </a>
+            </div>
+          )}
+
           {viewMode === 'hospital' && donor.status === 'ACCEPTED' && onConfirmDonation && (
             <div className="pt-1">
               <button
@@ -105,6 +134,7 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
               </button>
             </div>
           )}
+
         </div>
       )}
     </div>

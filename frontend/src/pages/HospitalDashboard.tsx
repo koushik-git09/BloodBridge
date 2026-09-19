@@ -78,7 +78,9 @@ function mapApiRequestToBloodRequest(
       matchScore: d.match_score,
       responses: d.donation_count,
       lastDonation: formattedLastDonation,
+      phone: d.phone ?? null,
       scores: {
+
         compatibility: 100,
         eligibility: 100,
         distance: Math.max(0, Math.min(100, 100 - d.distance * 4)),
@@ -95,7 +97,9 @@ function mapApiRequestToBloodRequest(
     urgency: request.urgency as Urgency,
     status: request.status as BloodRequest["status"],
     hospital: request.hospital_name || "Hospital",
+    patient_reference: request.patient_reference,
     createdAt: request.created_at,
+
     bloodBankUnits: request.blood_bank_units,
     donorUnits: request.donor_units,
     remainingUnits: request.remaining_units,
@@ -332,9 +336,10 @@ export default function HospitalDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-bb-text">
-              {user?.hospitalName || user?.name || "Hospital Command Center"}
+              {String(user?.hospitalName || user?.name || "Hospital Command Center")}
             </h1>
             <p className="mt-1 text-xs text-bb-muted">
+
               Real-time proximity blood matching with verified donors and nearby blood banks
             </p>
           </div>

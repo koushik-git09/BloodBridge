@@ -134,10 +134,16 @@ async def get_donor_statistics(
         last_donation = donations[0].get(
             "donated_at"
         )
+    elif donor:
+        last_donation = donor.get("lastDonation") or donor.get("last_donation_date")
+
+    donor_profile_count = int(donor.get("donationCount", 0)) if donor else 0
+    effective_total_donations = max(total_donations, donor_profile_count)
+    effective_total_units = max(total_units, effective_total_donations)
 
     return {
-        "total_donations": total_donations,
-        "total_units": total_units,
+        "total_donations": effective_total_donations,
+        "total_units": effective_total_units,
         "last_donation": last_donation,
         "trust_score": trust_score,
-    }
+    }

@@ -28,13 +28,16 @@ async def serialize_request(
 
     donor_matches = []
 
-    # Donor responses are recorded on donor_requests.  Older records may only
-    # have donor_matches, so use them as a backwards-compatible fallback.
+    # Donor responses are recorded on donor_requests. Only active donors (PENDING and ACCEPTED)
+    # are included in the active matched donor list. DONATED and DECLINED donors are excluded.
     cursor = db.donor_requests.find(
         {
             "request_id": str(
                 request["_id"]
-            )
+            ),
+            "status": {
+                "$in": ["PENDING", "ACCEPTED"]
+            },
         }
     ).sort(
         "match_score",
@@ -55,6 +58,11 @@ async def serialize_request(
 
         if not donor:
             continue
+
+        match_status = match.get("status", "PENDING")
+
+        # Privacy / Security: donor phone number is only visible once the donor has ACCEPTED the request
+        donor_phone = donor.get("phone") if match_status in ["ACCEPTED", "DONATED"] else None
 
         donor_matches.append({
             "donor_id": match["donor_id"],
@@ -94,12 +102,17 @@ async def serialize_request(
 
             "last_donation": donor.get("lastDonation"),
 
-            "status": match.get("status", "PENDING"),
+            "status": match_status,
+
+            "phone": donor_phone,
         })
 
     if not donor_matches:
         legacy_cursor = db.donor_matches.find(
-            {"request_id": str(request["_id"])}
+            {
+                "request_id": str(request["_id"]),
+                "status": {"$in": ["PENDING", "ACCEPTED"]},
+            }
         ).sort("match_score", -1).limit(10)
 
         async for match in legacy_cursor:
@@ -114,6 +127,9 @@ async def serialize_request(
             if not donor:
                 continue
 
+            match_status = match.get("status", "PENDING")
+            donor_phone = donor.get("phone") if match_status in ["ACCEPTED", "DONATED"] else None
+
             donor_matches.append({
                 "donor_id": match["donor_id"],
                 "name": donor.get("name", "Donor"),
@@ -124,8 +140,10 @@ async def serialize_request(
                 "trust_score": match["trust_score"],
                 "donation_count": donor.get("donationCount", 0),
                 "last_donation": donor.get("lastDonation"),
-                "status": match.get("status", "PENDING"),
+                "status": match_status,
+                "phone": donor_phone,
             })
+
 
     return {
         "id": str(
