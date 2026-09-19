@@ -63,3 +63,15 @@ def decode_access_token(token: str) -> dict | None:
 
     except JWTError:
         return None
+
+
+def generate_reset_token() -> str:
+    """Generate a cryptographically secure URL-safe random token."""
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(token: str) -> str:
+    """Return SHA-256 hash of a reset token for secure DB storage."""
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

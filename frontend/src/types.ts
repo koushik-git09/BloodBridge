@@ -46,7 +46,9 @@ export interface Donor {
   matchScore: number;
   responses: number;
   lastDonation: string;
+  phone?: string | null;
   scores: {
+
     compatibility: number;
     eligibility: number;
     distance: number;
@@ -64,7 +66,9 @@ export interface TimelineEvent {
 
 export interface BloodRequest {
   id: string;
+  patient_reference?: string;
   bloodGroup: BloodGroup;
+
   unitsRequired: number;
   urgency: Urgency;
   status: RequestStatus;

@@ -261,9 +261,18 @@ export default function LoginPage() {
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-semibold text-bb-text mb-2">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-bb-text">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/forgot-password?role=${roleParam}`)}
+                    className="text-xs font-semibold text-bb-muted hover:text-bb-crimson transition-colors"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
 
                 <input
                   type="password"
@@ -274,6 +283,7 @@ export default function LoginPage() {
                   className="w-full rounded-xl border border-bb-border bg-white px-4 py-3 text-sm text-bb-text outline-none transition focus:ring-2"
                 />
               </div>
+
 
               {/* Submit */}
               <button

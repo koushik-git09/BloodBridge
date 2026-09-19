@@ -58,6 +58,9 @@ class DonorMatchResponse(BaseModel):
 
     status: str
 
+    phone: str | None = None
+
+
 
 class BloodRequestResponse(BaseModel):
     id: str

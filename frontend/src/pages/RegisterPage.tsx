@@ -56,7 +56,10 @@ export default function RegisterPage() {
     event.preventDefault();
     setError("");
 
+    if (!role) return;
+
     if (location.latitude === null || location.longitude === null) {
+
       setError("Please click 'Use My Current Location' to enable location detection.");
       return;
     }

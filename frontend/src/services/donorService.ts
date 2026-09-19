@@ -17,7 +17,7 @@ export interface DonorRequest {
   match_score: number;
   trust_score: number;
 
-  status: "PENDING" | "ACCEPTED" | "DECLINED";
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "DONATED";
 
   created_at: string;
   responded_at?: string | null;
@@ -52,7 +52,7 @@ export async function respondToDonorRequest(
  * Get donation history for the logged-in donor.
  */
 export async function getDonorDonationHistory() {
-  return apiRequest<import("../types").DonationRecord[]>("/api/donors/me/donations");
+  return apiRequest<import("../types").DonationRecord[]>("/api/donations/me");
 }
 
 /**
@@ -60,4 +60,4 @@ export async function getDonorDonationHistory() {
  */
 export async function getDonorStatistics() {
   return apiRequest<import("../types").DonorStatistics>("/api/donors/me/statistics");
-}
+}

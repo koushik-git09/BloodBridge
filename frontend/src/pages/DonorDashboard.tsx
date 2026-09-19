@@ -125,6 +125,10 @@ export default function DonorDashboard() {
   };
 
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
+  const activeRequests = requests.filter(
+    (r) => r.status === "PENDING" || r.status === "ACCEPTED"
+  );
+
 
   return (
     <div className="min-h-screen bb-network-bg text-bb-text">
@@ -276,11 +280,12 @@ export default function DonorDashboard() {
             </div>
 
             <DonorRequestsList
-              requests={requests}
+              requests={activeRequests}
               onAccept={handleAcceptRequest}
               onDecline={handleDeclineRequest}
               actionLoadingId={actionLoadingId}
             />
+
           </div>
         )}
 
