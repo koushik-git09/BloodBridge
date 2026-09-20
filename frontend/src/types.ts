@@ -47,6 +47,7 @@ export interface Donor {
   responses: number;
   lastDonation: string;
   phone?: string | null;
+  respondedAt?: string | null;
   scores: {
 
     compatibility: number;
@@ -74,6 +75,8 @@ export interface BloodRequest {
   status: RequestStatus;
   hospital: string;
   createdAt: string;
+  updatedAt?: string;
+  fulfilledAt?: string;
   bloodBankUnits: number;
   donorUnits: number;
   remainingUnits: number;

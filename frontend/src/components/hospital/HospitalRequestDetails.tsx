@@ -5,6 +5,7 @@ import UrgencyBadge from "../UrgencyBadge";
 import RequestTimeline from "../RequestTimeline";
 import BloodFlowNetwork from "../BloodFlowNetwork";
 import HospitalDonorMatchingTab from "./HospitalDonorMatchingTab";
+import { formatDateTime } from "../../utils/date";
 
 interface HospitalRequestDetailsProps {
   request: BloodRequest | null;
@@ -47,7 +48,7 @@ export default function HospitalRequestDetails({
                 <UrgencyBadge urgency={request.urgency} />
               </div>
               <p className="text-xs text-bb-muted mt-0.5">
-                Created: {new Date(request.createdAt).toLocaleString()} • {request.hospital}
+                Created: {formatDateTime(request.createdAt)} • {request.hospital}
               </p>
             </div>
           </div>

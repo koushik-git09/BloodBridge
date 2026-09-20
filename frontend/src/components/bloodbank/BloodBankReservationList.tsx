@@ -1,11 +1,12 @@
 import { useState } from "react";
 import type { BloodBankReservationResponse, ReservationAction } from "../../services/bloodBankService";
-import type { Urgency } from "../../types";
+import type { BloodGroup, Urgency } from "../../types";
 import BloodGroupBadge from "../BloodGroupBadge";
 import UrgencyBadge from "../UrgencyBadge";
 
 interface BloodBankReservationListProps {
   reservations: BloodBankReservationResponse[];
+  inventory: Record<BloodGroup, number>;
   onRespond: (
     reservationId: string,
     action: ReservationAction,
@@ -16,6 +17,7 @@ interface BloodBankReservationListProps {
 
 export default function BloodBankReservationList({
   reservations,
+  inventory,
   onRespond,
   responding,
 }: BloodBankReservationListProps) {
@@ -23,13 +25,22 @@ export default function BloodBankReservationList({
   const [action, setAction] = useState<ReservationAction | null>(null);
   const [units, setUnits] = useState(0);
 
+  const selectedStock = selectedRes ? (inventory[selectedRes.blood_group] ?? 0) : 0;
+
   const handleOpenAction = (
     res: BloodBankReservationResponse,
     act: ReservationAction
   ) => {
+    const stock = inventory[res.blood_group] ?? 0;
+    if (act !== "REJECT" && stock <= 0) return;
     setSelectedRes(res);
     setAction(act);
-    setUnits(act === "CONFIRM" ? res.units_requested : Math.max(1, res.units_requested - 1));
+    if (act === "CONFIRM") {
+      setUnits(res.units_requested);
+    } else if (act === "PARTIAL") {
+      const maxAllowed = Math.max(1, Math.min(stock, res.units_requested - 1));
+      setUnits(maxAllowed);
+    }
   };
 
   const handleExecute = async () => {
@@ -66,17 +77,36 @@ export default function BloodBankReservationList({
               <p>
                 <strong>Units Requested:</strong> {selectedRes.units_requested}
               </p>
+              <p>
+                <strong>Current Stock in Bank:</strong>{" "}
+                <span
+                  className={`font-bold ${
+                    selectedStock > 0 ? "text-emerald-700" : "text-red-600"
+                  }`}
+                >
+                  {selectedStock} {selectedStock === 1 ? "unit" : "units"} in inventory
+                </span>
+              </p>
             </div>
+
+            {action === "CONFIRM" && selectedStock < selectedRes.units_requested && (
+              <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 space-y-1">
+                <p className="font-bold">⚠️ Insufficient Stock to Confirm All Units</p>
+                <p>
+                  You have {selectedStock} units of {selectedRes.blood_group} in stock, but {selectedRes.units_requested} units were requested. You cannot confirm more than what is available.
+                </p>
+              </div>
+            )}
 
             {action === "PARTIAL" && (
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-bb-text">
-                  Units you can confirm (1 to {selectedRes.units_requested - 1}):
+                  Units you can confirm (1 to {Math.min(selectedStock, selectedRes.units_requested - 1)}):
                 </label>
                 <input
                   type="number"
                   min={1}
-                  max={selectedRes.units_requested - 1}
+                  max={Math.min(selectedStock, selectedRes.units_requested - 1)}
                   value={units}
                   onChange={(e) => setUnits(Number(e.target.value))}
                   className="w-full rounded-xl border border-bb-border bg-white px-3 py-2 text-sm text-bb-text outline-none focus:ring-2 focus:ring-bb-crimson"
@@ -103,9 +133,13 @@ export default function BloodBankReservationList({
               </button>
               <button
                 type="button"
-                disabled={responding}
+                disabled={
+                  responding ||
+                  (action === "CONFIRM" && selectedStock < selectedRes.units_requested) ||
+                  (action === "PARTIAL" && (units <= 0 || units > selectedStock || selectedStock <= 0))
+                }
                 onClick={handleExecute}
-                className={`rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition ${
+                className={`rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === "REJECT"
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-bb-crimson hover:bg-bb-crimson-bright"
@@ -146,6 +180,10 @@ export default function BloodBankReservationList({
             const isPartial = res.status === "PARTIAL";
             const isRejected = res.status === "REJECTED";
 
+            const stock = inventory[res.blood_group] ?? 0;
+            const hasStock = stock > 0;
+            const hasFullStock = stock >= res.units_requested;
+
             return (
               <div
                 key={res.id}
@@ -162,6 +200,13 @@ export default function BloodBankReservationList({
                         <span>Distance: <strong className="text-bb-text">{res.distance.toFixed(1)} km</strong></span>
                         <span>•</span>
                         <span>Requested: <strong className="text-bb-text">{res.units_requested} units</strong></span>
+                        <span>•</span>
+                        <span>
+                          In Stock:{" "}
+                          <strong className={hasStock ? "text-emerald-700" : "text-red-600 font-bold"}>
+                            {stock} {stock === 1 ? "unit" : "units"}
+                          </strong>
+                        </span>
                         {res.units_confirmed > 0 && (
                           <>
                             <span>•</span>
@@ -193,32 +238,43 @@ export default function BloodBankReservationList({
                 </div>
 
                 {isPending && (
-                  <div className="mt-4 flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-bb-border/60">
-                    <button
-                      type="button"
-                      disabled={responding}
-                      onClick={() => handleOpenAction(res, "REJECT")}
-                      className="rounded-xl border border-bb-border px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      disabled={responding}
-                      onClick={() => handleOpenAction(res, "PARTIAL")}
-                      className="rounded-xl border border-blue-300 bg-blue-50/60 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
-                    >
-                      Partial Units
-                    </button>
-                    <button
-                      type="button"
-                      disabled={responding}
-                      onClick={() => handleOpenAction(res, "CONFIRM")}
-                      className="rounded-xl bg-bb-crimson px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition"
-                    >
-                      Confirm All ({res.units_requested} units)
-                    </button>
-                  </div>
+                  <>
+                    {!hasStock && (
+                      <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-2.5 text-xs text-red-700 flex items-center justify-between">
+                        <span>
+                          ⚠️ <strong>Out of Stock:</strong> You have 0 units of {res.blood_group} in inventory. You cannot confirm units without stock. Please reject this request to route immediately to donors.
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-bb-border/60">
+                      <button
+                        type="button"
+                        disabled={responding}
+                        onClick={() => handleOpenAction(res, "REJECT")}
+                        className="rounded-xl border border-bb-border px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        disabled={responding || !hasStock}
+                        onClick={() => handleOpenAction(res, "PARTIAL")}
+                        title={!hasStock ? "No stock available in inventory" : undefined}
+                        className="rounded-xl border border-blue-300 bg-blue-50/60 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Partial Units
+                      </button>
+                      <button
+                        type="button"
+                        disabled={responding || !hasFullStock}
+                        onClick={() => handleOpenAction(res, "CONFIRM")}
+                        title={!hasFullStock ? (stock === 0 ? "No stock in inventory" : `Only ${stock} units in inventory`) : undefined}
+                        className="rounded-xl bg-bb-crimson px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Confirm All ({res.units_requested} units)
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             );

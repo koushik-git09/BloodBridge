@@ -1,5 +1,6 @@
 import type { DonorStatistics, BloodGroup } from "../../types";
 import BloodGroupBadge from "../BloodGroupBadge";
+import { parseUtcDate, formatDate } from "../../utils/date";
 
 interface DonorStatsProps {
   bloodGroup?: string | null;
@@ -16,12 +17,22 @@ export default function DonorStats({
   const totalUnits = statistics?.total_units ?? 0;
   const trustScore = statistics?.trust_score ?? 50;
 
-  const formattedLastDonation = statistics?.last_donation
-    ? new Date(statistics.last_donation).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
+  const parsedLastDonation = parseUtcDate(statistics?.last_donation);
+  const daysSinceLastDonation = parsedLastDonation
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - parsedLastDonation.getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      )
+    : null;
+
+  const isEligible = daysSinceLastDonation === null || daysSinceLastDonation >= 90;
+  const daysRemaining = daysSinceLastDonation !== null ? Math.max(0, 90 - daysSinceLastDonation) : 0;
+
+  const formattedLastDonation = parsedLastDonation
+    ? formatDate(parsedLastDonation)
     : "No prior donations";
 
   return (
@@ -61,15 +72,42 @@ export default function DonorStats({
 
       {/* Last Donation */}
       <div className="glass rounded-2xl p-4 sm:p-5 border border-bb-border">
-        <p className="text-xs font-semibold uppercase tracking-wider text-bb-muted">
-          Last Donation
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wider text-bb-muted">
+            Last Donation
+          </p>
+          {statistics?.last_donation && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                isEligible
+                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                  : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+              }`}
+            >
+              {isEligible ? "Eligible" : `${daysRemaining}d Cooldown`}
+            </span>
+          )}
+        </div>
         <p className="mt-2 text-lg font-bold text-bb-text sm:text-xl truncate">
           {formattedLastDonation}
         </p>
-        <p className="mt-1 text-xs text-bb-muted">
-          {statistics?.last_donation ? "Verified donation record" : "Eligible to donate"}
-        </p>
+        <div className="mt-1 text-xs">
+          {statistics?.last_donation ? (
+            isEligible ? (
+              <span className="text-emerald-600 font-medium">
+                ✓ Cooldown complete ({daysSinceLastDonation}d ago)
+              </span>
+            ) : (
+              <span className="text-amber-600 font-medium">
+                ⏳ {daysRemaining} days left until eligible
+              </span>
+            )
+          ) : (
+            <span className="text-emerald-600 font-medium">
+              ✓ Eligible to donate
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Trust Score */}

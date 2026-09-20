@@ -14,6 +14,7 @@ export interface DonorMatchResponse {
   last_donation?: string | null;
   status: "PENDING" | "ACCEPTED" | "DECLINED" | "DONATED";
   phone?: string | null;
+  responded_at?: string | null;
 }
 
 export interface BloodRequestResponse {
@@ -36,6 +37,8 @@ export interface BloodRequestResponse {
   notes?: string;
 
   created_at: string;
+  updated_at?: string;
+  fulfilled_at?: string;
   donors?: DonorMatchResponse[];
   // Accepted during migration if an older API deployment uses this field.
   donor_matches?: DonorMatchResponse[];

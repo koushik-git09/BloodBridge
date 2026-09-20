@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { getCurrentUser, login } from "../services/authService";
 import type { Role } from "../types";
 
@@ -44,10 +44,21 @@ const roleFromPath = (value?: string): Role | undefined => {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { role: roleParam } = useParams<{ role: string }>();
   const selectedRole = roleFromPath(roleParam);
-  const [email, setEmail] = useState("");
+
+  const locationState = location.state as {
+    registered?: boolean;
+    message?: string;
+    email?: string;
+  } | null;
+
+  const [email, setEmail] = useState(locationState?.email || "");
   const [password, setPassword] = useState("");
+  const [successMessage, setSuccessMessage] = useState(
+    locationState?.message || "",
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +71,7 @@ export default function LoginPage() {
     event.preventDefault();
 
     setError("");
+    setSuccessMessage("");
     setLoading(true);
 
     try {
@@ -229,6 +241,23 @@ export default function LoginPage() {
               <p className="text-sm text-bb-dim mt-4">{config.description}</p>
             </div>
 
+            {/* Success */}
+            {successMessage && (
+              <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="font-bold text-emerald-600">✓</span>
+                  <span>{successMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSuccessMessage("")}
+                  className="text-emerald-700 hover:text-emerald-950 text-xs font-bold ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
@@ -247,7 +276,10 @@ export default function LoginPage() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    if (successMessage) setSuccessMessage("");
+                  }}
                   placeholder="you@example.com"
                   required
                   className="w-full rounded-xl border border-bb-border bg-white px-4 py-3 text-sm text-bb-text outline-none transition focus:ring-2"
@@ -265,19 +297,21 @@ export default function LoginPage() {
                   <label className="block text-sm font-semibold text-bb-text">
                     Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/forgot-password?role=${roleParam}`)}
+                  <Link
+                    to={`/forgot-password?role=${roleParam}`}
                     className="text-xs font-semibold text-bb-muted hover:text-bb-crimson transition-colors"
                   >
                     Forgot Password?
-                  </button>
+                  </Link>
                 </div>
 
                 <input
                   type="password"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (successMessage) setSuccessMessage("");
+                  }}
                   placeholder="Enter your password"
                   required
                   className="w-full rounded-xl border border-bb-border bg-white px-4 py-3 text-sm text-bb-text outline-none transition focus:ring-2"
@@ -303,15 +337,15 @@ export default function LoginPage() {
             <div className="text-center mt-6">
               <p className="text-sm text-bb-dim">Don't have an account?</p>
 
-              <button
-                onClick={() => navigate(`/register/${roleParam}`)}
-                className="mt-2 text-sm font-semibold transition-colors"
+              <Link
+                to={`/register/${roleParam}`}
+                className="mt-2 inline-block text-sm font-semibold transition-colors hover:underline"
                 style={{
                   color: config.color,
                 }}
               >
                 Create a BloodBridge account →
-              </button>
+              </Link>
             </div>
           </div>
 

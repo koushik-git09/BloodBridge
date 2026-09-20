@@ -1,5 +1,6 @@
 import type { DonationRecord } from "../../types";
 import BloodGroupBadge from "../BloodGroupBadge";
+import { formatDate } from "../../utils/date";
 
 interface DonationHistoryProps {
   donations: DonationRecord[];
@@ -64,11 +65,7 @@ export default function DonationHistory({
           </thead>
           <tbody className="divide-y divide-bb-border">
             {donations.map((donation) => {
-              const formattedDate = new Date(donation.donated_at).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              });
+              const formattedDate = formatDate(donation.donated_at);
 
               return (
                 <tr key={donation.id} className="hover:bg-white/60 transition-colors">

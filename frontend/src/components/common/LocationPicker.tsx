@@ -10,11 +10,18 @@ export default function LocationPicker({ onLocationChange, initialAddress = "" }
   const { latitude, longitude, address, loading, error, success, requestLocation, setManualAddress } =
     useGeolocation();
 
+  const lastReportedRef = React.useRef<string>("");
+
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setManualAddress(val);
     if (latitude !== null && longitude !== null) {
-      onLocationChange({ latitude, longitude, address: val });
+      lastReportedRef.current = `${latitude},${longitude},${val}`;
+      onLocationChange({
+        latitude,
+        longitude,
+        address: val,
+      });
     }
   };
 
@@ -22,14 +29,18 @@ export default function LocationPicker({ onLocationChange, initialAddress = "" }
     requestLocation();
   };
 
-  // Trigger parent update when location succeeds
+  // Trigger parent update when location succeeds without re-render looping
   React.useEffect(() => {
     if (success && latitude !== null && longitude !== null) {
-      onLocationChange({
-        latitude,
-        longitude,
-        address: address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-      });
+      const key = `${latitude},${longitude},${address}`;
+      if (lastReportedRef.current !== key) {
+        lastReportedRef.current = key;
+        onLocationChange({
+          latitude,
+          longitude,
+          address: address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        });
+      }
     }
   }, [success, latitude, longitude, address, onLocationChange]);
 
@@ -40,7 +51,7 @@ export default function LocationPicker({ onLocationChange, initialAddress = "" }
           Location
         </label>
         <p className="text-xs text-bb-muted">
-          Your location is used to find nearby donors and blood banks.
+          Please provide the location to continue
         </p>
       </div>
 

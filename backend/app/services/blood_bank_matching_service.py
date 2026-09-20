@@ -153,17 +153,14 @@ async def find_matching_blood_banks(
         )
 
         # -------------------------------------------------
-        # Calculate total compatible inventory
+        # Verify available inventory for requested blood group
         # -------------------------------------------------
 
-        compatible_units = 0
+        available_units = int(
+            inventory.get(blood_group, 0)
+        )
 
-        for group in compatible_groups:
-            compatible_units += int(
-                inventory.get(group, 0)
-            )
-
-        if compatible_units <= 0:
+        if available_units <= 0:
             continue
 
         # -------------------------------------------------
@@ -187,7 +184,7 @@ async def find_matching_blood_banks(
             ),
             "blood_group": blood_group,
             "compatible_groups": compatible_groups,
-            "available_units": compatible_units,
+            "available_units": available_units,
             "distance": distance,
             "location": location,
         })

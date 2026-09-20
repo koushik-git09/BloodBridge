@@ -377,17 +377,22 @@ async def confirm_donor_donation(
     # Update blood request
     # -----------------------------------------------------
 
+    update_data = {
+        "donor_units": new_donor_units,
+        "remaining_units": remaining_units,
+        "status": new_status,
+        "updated_at": now,
+    }
+
+    if remaining_units == 0 and not blood_request.get("fulfilled_at"):
+        update_data["fulfilled_at"] = now
+
     await db.blood_requests.update_one(
         {
             "_id": ObjectId(request_id)
         },
         {
-            "$set": {
-                "donor_units": new_donor_units,
-                "remaining_units": remaining_units,
-                "status": new_status,
-                "updated_at": now,
-            }
+            "$set": update_data
         },
     )
 

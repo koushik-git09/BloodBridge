@@ -60,6 +60,8 @@ class DonorMatchResponse(BaseModel):
 
     phone: str | None = None
 
+    responded_at: datetime | None = None
+
 
 
 class BloodRequestResponse(BaseModel):
@@ -88,6 +90,10 @@ class BloodRequestResponse(BaseModel):
     notes: str | None = None
 
     created_at: datetime
+
+    updated_at: datetime | None = None
+
+    fulfilled_at: datetime | None = None
 
     donors: list[DonorMatchResponse] = Field(default_factory=list)
 

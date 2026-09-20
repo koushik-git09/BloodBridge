@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { BloodGroup } from "../../types";
 
 const BLOOD_GROUPS: BloodGroup[] = [
@@ -21,6 +21,21 @@ export default function BloodBankInventoryEditor({
   saving,
 }: BloodBankInventoryEditorProps) {
   const [draft, setDraft] = useState<Record<BloodGroup, number>>({ ...inventory });
+
+  useEffect(() => {
+    if (isOpen) {
+      setDraft({
+        "A+": inventory["A+"] ?? 0,
+        "A-": inventory["A-"] ?? 0,
+        "B+": inventory["B+"] ?? 0,
+        "B-": inventory["B-"] ?? 0,
+        "AB+": inventory["AB+"] ?? 0,
+        "AB-": inventory["AB-"] ?? 0,
+        "O+": inventory["O+"] ?? 0,
+        "O-": inventory["O-"] ?? 0,
+      });
+    }
+  }, [isOpen, inventory]);
 
   if (!isOpen) return null;
 

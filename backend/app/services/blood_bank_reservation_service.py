@@ -231,6 +231,16 @@ async def update_main_blood_request(
     # Update request
     # -----------------------------------------------------
 
+    update_data = {
+        "blood_bank_units": new_blood_bank_units,
+        "remaining_units": remaining_units,
+        "status": new_status,
+        "updated_at": datetime.now(timezone.utc),
+    }
+
+    if remaining_units == 0 and not blood_request.get("fulfilled_at"):
+        update_data["fulfilled_at"] = datetime.now(timezone.utc)
+
     await db.blood_requests.update_one(
         {
             "_id": ObjectId(
@@ -238,17 +248,7 @@ async def update_main_blood_request(
             )
         },
         {
-            "$set": {
-                "blood_bank_units": new_blood_bank_units,
-
-                "remaining_units": remaining_units,
-
-                "status": new_status,
-
-                "updated_at": datetime.now(
-                    timezone.utc
-                ),
-            }
+            "$set": update_data
         },
     )
 
@@ -378,11 +378,30 @@ async def respond_to_reservation(
         "units_requested"
     ]
 
+    blood_bank = await db.users.find_one(
+        {
+            "_id": ObjectId(blood_bank_id),
+            "role": "BLOOD_BANK",
+        }
+    )
+
+    if not blood_bank:
+        return None, "NOT_FOUND"
+
+    inventory = blood_bank.get("inventory", {})
+    available_stock = int(inventory.get(reservation["blood_group"], 0))
+
     # -----------------------------------------------------
-    # Validate action
+    # Validate action and inventory stock
     # -----------------------------------------------------
 
     if action == "CONFIRM":
+
+        if available_stock <= 0:
+            return None, "NO_STOCK_AVAILABLE"
+
+        if units_requested > available_stock:
+            return None, "INSUFFICIENT_STOCK"
 
         if units_confirmed != units_requested:
             return None, "INVALID_CONFIRM"
@@ -390,6 +409,12 @@ async def respond_to_reservation(
         new_status = "CONFIRMED"
 
     elif action == "PARTIAL":
+
+        if available_stock <= 0:
+            return None, "NO_STOCK_AVAILABLE"
+
+        if units_confirmed > available_stock:
+            return None, "INSUFFICIENT_STOCK"
 
         if (
             units_confirmed <= 0
