@@ -85,6 +85,18 @@ async def respond_reservation(
             detail="For PARTIAL, units_confirmed must be greater than 0 and less than units_requested",
         )
 
+    if error == "NO_STOCK_AVAILABLE":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot confirm reservation: No stock available in your blood bank inventory for this blood group.",
+        )
+
+    if error == "INSUFFICIENT_STOCK":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot confirm reservation: Requested units exceed your available inventory stock.",
+        )
+
     if error == "INVALID_ACTION":
         raise HTTPException(
             status_code=400,

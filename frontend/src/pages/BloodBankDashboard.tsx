@@ -84,6 +84,7 @@ export default function BloodBankDashboard() {
       setInventory({ ...EMPTY_INVENTORY, ...res.inventory });
       setShowEditor(false);
       showToast("Inventory updated successfully.");
+      await loadDashboard();
     } catch (err) {
       console.error("Failed to update inventory:", err);
       showToast(err instanceof Error ? err.message : "Failed to update inventory.");
@@ -247,6 +248,7 @@ export default function BloodBankDashboard() {
         {/* Incoming Hospital Reservations */}
         <BloodBankReservationList
           reservations={reservations}
+          inventory={inventory}
           onRespond={handleRespondReservation}
           responding={responding}
         />

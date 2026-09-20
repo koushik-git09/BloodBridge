@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useState, useCallback } from "react";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { register } from "../services/authService";
 import type { BloodGroup, Role } from "../types";
 import LocationPicker from "../components/common/LocationPicker";
@@ -43,14 +43,13 @@ export default function RegisterPage() {
   if (!role) return <Navigate to="/roles" replace />;
   const loginPath = `/login/${role === "BLOOD_BANK" ? "blood-bank" : role.toLowerCase()}`;
 
-  const handleLocationChange = (loc: {
-    latitude: number;
-    longitude: number;
-    address: string;
-  }) => {
-    setLocation(loc);
-    setError("");
-  };
+  const handleLocationChange = useCallback(
+    (loc: { latitude: number; longitude: number; address: string }) => {
+      setLocation(loc);
+      setError("");
+    },
+    [],
+  );
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -58,30 +57,42 @@ export default function RegisterPage() {
 
     if (!role) return;
 
+    // Strictly require location detection before account creation
     if (location.latitude === null || location.longitude === null) {
-
-      setError("Please click 'Use My Current Location' to enable location detection.");
+      setError("Please click 'Use My Current Location' to detect your location before creating an account.");
       return;
     }
 
     setLoading(true);
     try {
       await register({
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
         password: form.password,
         role,
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
-          address: location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
+          address:
+            location.address.trim() ||
+            `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
         },
         ...(role === "DONOR" ? { bloodGroup: form.bloodGroup } : {}),
-        ...(role === "HOSPITAL" ? { hospitalName: form.hospitalName } : {}),
+        ...(role === "HOSPITAL" ? { hospitalName: form.hospitalName.trim() } : {}),
       });
-      navigate(loginPath);
+
+      // Navigate to role-specific login page only upon confirmed successful registration
+      navigate(loginPath, {
+        replace: true,
+        state: {
+          registered: true,
+          email: form.email.trim(),
+          message: "Account created successfully. Please log in.",
+        },
+      });
     } catch (err) {
+      // Stay on registration page and display error without clearing the form
       setError(
         err instanceof Error
           ? err.message
@@ -108,9 +119,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bb-network-bg flex flex-col">
       <nav className="glass border-b border-bb-border px-4 sm:px-6 h-14 flex items-center">
-        <button
-          onClick={() => navigate(loginPath)}
-          className="flex items-center gap-2 text-bb-muted hover:text-bb-text"
+        <Link
+          to={loginPath}
+          className="flex items-center gap-2 text-bb-muted hover:text-bb-text transition-colors"
         >
           <span aria-hidden="true">←</span>
           <img
@@ -121,7 +132,7 @@ export default function RegisterPage() {
           <span className="font-bold">
             Blood<span className="text-bb-crimson-bright">Bridge</span>
           </span>
-        </button>
+        </Link>
       </nav>
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
@@ -185,13 +196,12 @@ export default function RegisterPage() {
             </button>
             <p className="text-center text-sm text-bb-dim">
               Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => navigate(loginPath)}
-                className="font-semibold text-bb-crimson"
+              <Link
+                to={loginPath}
+                className="font-semibold text-bb-crimson hover:underline"
               >
                 Login
-              </button>
+              </Link>
             </p>
           </form>
         </div>

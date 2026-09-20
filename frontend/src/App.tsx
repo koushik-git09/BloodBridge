@@ -34,8 +34,18 @@ export default function App() {
         {/* ================= AUTH ROUTES ================= */}
 
         <Route
+          path="/login"
+          element={<RoleSelectorPage />}
+        />
+
+        <Route
           path="/login/:role"
           element={<LoginPage />}
+        />
+
+        <Route
+          path="/register"
+          element={<RoleSelectorPage />}
         />
 
         <Route

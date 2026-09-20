@@ -18,6 +18,24 @@ def calculate_remaining_units(request: dict) -> int:
     )
 
 
+def to_utc(dt):
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+    if isinstance(dt, str):
+        try:
+            parsed = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except Exception:
+            return dt
+    return dt
+
+
 async def serialize_request(
     request: dict,
 ) -> dict:
@@ -100,11 +118,13 @@ async def serialize_request(
                 0,
             ),
 
-            "last_donation": donor.get("lastDonation"),
+            "last_donation": to_utc(donor.get("lastDonation")),
 
             "status": match_status,
 
             "phone": donor_phone,
+
+            "responded_at": to_utc(match.get("responded_at")),
         })
 
     if not donor_matches:
@@ -132,6 +152,7 @@ async def serialize_request(
 
             donor_matches.append({
                 "donor_id": match["donor_id"],
+                "donor_request_id": match.get("donor_request_id"),
                 "name": donor.get("name", "Donor"),
                 "blood_group": match["blood_group"],
                 "availability": donor.get("availability", "AVAILABLE"),
@@ -139,9 +160,10 @@ async def serialize_request(
                 "match_score": match["match_score"],
                 "trust_score": match["trust_score"],
                 "donation_count": donor.get("donationCount", 0),
-                "last_donation": donor.get("lastDonation"),
+                "last_donation": to_utc(donor.get("lastDonation")),
                 "status": match_status,
                 "phone": donor_phone,
+                "responded_at": to_utc(match.get("responded_at")),
             })
 
 
@@ -196,9 +218,20 @@ async def serialize_request(
             "notes"
         ),
 
-        "created_at": request[
-            "created_at"
-        ],
+        "created_at": to_utc(request.get("created_at")),
+
+        "updated_at": to_utc(
+            request.get(
+                "updated_at",
+                request.get("created_at"),
+            )
+        ),
+
+        "fulfilled_at": to_utc(
+            request.get(
+                "fulfilled_at",
+            )
+        ),
 
         "donors": donor_matches,
     }
@@ -491,17 +524,22 @@ async def confirm_donation(
     # Update blood request
     # -----------------------------------------------------
 
+    update_data = {
+        "donor_units": new_donor_units,
+        "remaining_units": new_remaining_units,
+        "status": new_status,
+        "updated_at": now,
+    }
+
+    if new_remaining_units == 0 and not blood_request.get("fulfilled_at"):
+        update_data["fulfilled_at"] = now
+
     await db.blood_requests.update_one(
         {
             "_id": ObjectId(request_id)
         },
         {
-            "$set": {
-                "donor_units": new_donor_units,
-                "remaining_units": new_remaining_units,
-                "status": new_status,
-                "updated_at": now,
-            }
+            "$set": update_data
         },
     )
 

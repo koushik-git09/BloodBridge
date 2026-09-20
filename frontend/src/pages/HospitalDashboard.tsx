@@ -20,39 +20,57 @@ import HospitalRequestList from "../components/hospital/HospitalRequestList";
 import HospitalRequestDetails from "../components/hospital/HospitalRequestDetails";
 import HospitalNotificationsModal from "../components/hospital/HospitalNotificationsModal";
 import CreateRequestFlow from "../components/CreateRequestFlow";
+import { formatTime, formatDate } from "../utils/date";
 
 function mapApiRequestToBloodRequest(
   request: Awaited<ReturnType<typeof getHospitalRequests>>[number]
 ): BloodRequest {
-  const createdDate = new Date(request.created_at);
-  const formattedTime = createdDate.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const formattedCreatedTime = formatTime(request.created_at);
 
   const isFulfilled =
     request.status === "FULFILLED" || request.status === "CONFIRMED";
 
+  const donorMatches = request.donors ?? request.donor_matches ?? [];
+
+  // Determine actual fulfillment timestamp
+  let fulfillmentTimestamp = request.fulfilled_at || null;
+  if (!fulfillmentTimestamp && isFulfilled) {
+    const donatedDonor = donorMatches.find(
+      (d) => d.status === "DONATED" && d.responded_at
+    );
+    if (donatedDonor?.responded_at) {
+      fulfillmentTimestamp = donatedDonor.responded_at;
+    } else if (request.updated_at && request.updated_at !== request.created_at) {
+      fulfillmentTimestamp = request.updated_at;
+    }
+  }
+
+  const formattedFulfilledTime = fulfillmentTimestamp
+    ? formatTime(fulfillmentTimestamp)
+    : isFulfilled
+      ? formattedCreatedTime
+      : "—";
+
   const timeline = [
     {
       event: "Request Created",
-      time: formattedTime,
+      time: formattedCreatedTime,
       completed: true,
     },
     {
       event: "Hospital Verification",
-      time: formattedTime,
+      time: formattedCreatedTime,
       completed: true,
     },
     {
       event: "Scanning Blood Banks",
-      time: formattedTime,
+      time: formattedCreatedTime,
       completed: request.status !== "CHECKING_BLOOD_BANK",
       active: request.status === "CHECKING_BLOOD_BANK",
     },
     {
       event: "Fulfillment",
-      time: isFulfilled ? formattedTime : "—",
+      time: formattedFulfilledTime,
       completed: isFulfilled,
       active:
         request.status === "PARTIAL_FULFILLMENT" ||
@@ -60,11 +78,9 @@ function mapApiRequestToBloodRequest(
     },
   ];
 
-  const donorMatches = request.donors ?? request.donor_matches ?? [];
-
   const donors: Donor[] = donorMatches.map((d) => {
     const formattedLastDonation = d.last_donation
-      ? new Date(d.last_donation).toLocaleDateString()
+      ? formatDate(d.last_donation)
       : "No prior donation";
 
     return {
@@ -79,6 +95,7 @@ function mapApiRequestToBloodRequest(
       responses: d.donation_count,
       lastDonation: formattedLastDonation,
       phone: d.phone ?? null,
+      respondedAt: d.responded_at ?? null,
       scores: {
 
         compatibility: 100,
@@ -99,6 +116,8 @@ function mapApiRequestToBloodRequest(
     hospital: request.hospital_name || "Hospital",
     patient_reference: request.patient_reference,
     createdAt: request.created_at,
+    updatedAt: request.updated_at,
+    fulfilledAt: request.fulfilled_at,
 
     bloodBankUnits: request.blood_bank_units,
     donorUnits: request.donor_units,
@@ -211,16 +230,22 @@ export default function HospitalDashboard() {
   }, [loadRequests]);
 
   const handleCreateSubmit = async (data: {
+    patientReference: string;
     bloodGroup: BloodGroup;
     unitsRequired: number;
     urgency: Urgency;
     notes?: string;
   }) => {
+    if (!data.patientReference?.trim()) {
+      showToast("Patient reference is required.");
+      return;
+    }
+
     const payload: CreateBloodRequestData = {
       blood_group: data.bloodGroup,
       units_required: data.unitsRequired,
       urgency: data.urgency,
-      patient_reference: `PT-${Date.now().toString().slice(-6)}`,
+      patient_reference: data.patientReference.trim(),
       notes: data.notes,
     };
 
