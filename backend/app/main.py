@@ -9,6 +9,7 @@ from app.routers.donor_matching import router as donor_matching_router
 from app.routers import donor_requests
 from app.routers import users
 from app.routers import donations
+from app.routers.notifications import router as notifications_router
 app = FastAPI(
     title="BloodBridge API",
     version="1.0.0"
@@ -42,6 +43,8 @@ app.include_router(
 app.include_router(
     donations.donations_router
 )
+app.include_router(notifications_router)
+
 
 @app.get("/")
 async def root():

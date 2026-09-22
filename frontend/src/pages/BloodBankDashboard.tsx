@@ -15,6 +15,8 @@ import InventoryMatrix from "../components/InventoryMatrix";
 import BloodBankStats from "../components/bloodbank/BloodBankStats";
 import BloodBankReservationList from "../components/bloodbank/BloodBankReservationList";
 import BloodBankInventoryEditor from "../components/bloodbank/BloodBankInventoryEditor";
+import NotificationCenter from "../components/common/NotificationCenter";
+
 
 const EMPTY_INVENTORY: Record<BloodGroup, number> = {
   "A+": 0,
@@ -161,6 +163,7 @@ export default function BloodBankDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
+          <NotificationCenter />
           <button
             type="button"
             onClick={() => setShowEditor(true)}
@@ -168,6 +171,7 @@ export default function BloodBankDashboard() {
           >
             Manage Inventory
           </button>
+
           <button
             type="button"
             onClick={handleLogout}

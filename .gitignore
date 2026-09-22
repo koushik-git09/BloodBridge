@@ -15,6 +15,10 @@ backend/.env
 backend/.venv/
 .venv/
 
+.env.local
+.env.*.local
+credentials/
+
 # =========================
 # Node.js
 # =========================

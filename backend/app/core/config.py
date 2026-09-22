@@ -33,4 +33,13 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME).strip()
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+
+# Firebase Cloud Messaging & Admin Settings
+FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "credentials/firebase-service-account.json")
+FIREBASE_CREDENTIALS_FULL_PATH = (
+    Path(FIREBASE_CREDENTIALS_PATH)
+    if os.path.isabs(FIREBASE_CREDENTIALS_PATH)
+    else BASE_DIR / FIREBASE_CREDENTIALS_PATH
+)
+

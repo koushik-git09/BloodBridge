@@ -16,6 +16,8 @@ import DonorStats from "../components/donor/DonorStats";
 import DonationHistory from "../components/donor/DonationHistory";
 import DonorRequestsList from "../components/donor/DonorRequestsList";
 import DonorEligibilityGuide from "../components/donor/DonorEligibilityGuide";
+import NotificationCenter from "../components/common/NotificationCenter";
+
 
 type Tab = "overview" | "history" | "requirements";
 
@@ -158,11 +160,13 @@ export default function DonorDashboard() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4">
+          <NotificationCenter onSelectNotification={() => setTab("overview")} />
           <AvailabilitySelector
             availability={availability}
             onUpdate={handleAvailabilityUpdate}
             loading={updatingAvailability}
           />
+
           <button
             type="button"
             onClick={handleLogout}

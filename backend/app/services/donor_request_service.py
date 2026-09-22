@@ -1,8 +1,12 @@
 from datetime import datetime, timezone
+import logging
 from bson import ObjectId
 
 from app.database.mongodb import db
 from app.services.donor_matching_service import find_matching_donors
+from app.services.notification_service import send_notification_to_user
+
+logger = logging.getLogger("bloodbridge.donor_requests")
 
 
 async def create_donor_requests_for_blood_request(
@@ -24,6 +28,17 @@ async def create_donor_requests_for_blood_request(
     )
 
     created_requests = []
+
+    # Get blood request details for notification
+    try:
+        blood_req = await db.blood_requests.find_one({"_id": ObjectId(request_id)})
+    except Exception:
+        blood_req = None
+
+    hospital_name = (blood_req.get("hospital_name") if blood_req else None) or "Hospital"
+    urgency = (blood_req.get("urgency") if blood_req else None) or "NORMAL"
+    patient_ref = (blood_req.get("patient_reference") if blood_req else None) or ""
+    is_emergency = urgency in ["CRITICAL", "URGENT"]
 
     for donor in donors:
 
@@ -62,7 +77,38 @@ async def create_donor_requests_for_blood_request(
 
         created_requests.append(donor_request)
 
+        # Dispatch FCM and in-app emergency/standard notification to matched donor
+        notif_title = "🚨 EMERGENCY BLOOD REQUEST" if is_emergency else "New Blood Request"
+        notif_msg = (
+            f"{blood_group} blood is urgently required at {hospital_name}."
+            if is_emergency
+            else f"{blood_group} blood is required at {hospital_name}."
+        )
+        notif_type = "EMERGENCY_BLOOD_REQUEST" if is_emergency else "BLOOD_REQUEST"
+
+        try:
+            await send_notification_to_user(
+                user_id=donor_id,
+                title=notif_title,
+                message=notif_msg,
+                notification_type=notif_type,
+                data={
+                    "type": notif_type,
+                    "request_id": request_id,
+                    "donor_request_id": str(result.inserted_id),
+                    "blood_group": blood_group,
+                    "urgency": urgency,
+                    "patient_reference": patient_ref,
+                    "notification_type": notif_type,
+                },
+                urgency=urgency,
+                dedup_key=f"donor_req_alert:{request_id}:{donor_id}",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch notification to donor {donor_id}: {e}")
+
     return created_requests
+
 
 
 async def get_donor_requests_for_donor(
@@ -206,7 +252,29 @@ async def respond_to_donor_request(
         },
     )
 
+    # Notify hospital that a donor has accepted the blood request (without exposing donor phone in push)
+    if action == "ACCEPT":
+        try:
+            await send_notification_to_user(
+                user_id=donor_request["hospital_id"],
+                title="Donor Accepted",
+                message="A matched donor has accepted your blood request.",
+                notification_type="DONOR_ACCEPTED",
+                data={
+                    "type": "DONOR_ACCEPTED",
+                    "request_id": donor_request["request_id"],
+                    "donor_request_id": donor_request_id,
+                    "blood_group": donor_request.get("blood_group", ""),
+                    "notification_type": "DONOR_ACCEPTED",
+                },
+                urgency="NORMAL",
+                dedup_key=f"donor_accepted:{donor_request['request_id']}:{donor_request_id}",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify hospital of donor acceptance: {e}")
+
     return updated_request, None
+
 
 
 async def confirm_donor_donation(
@@ -318,9 +386,30 @@ async def confirm_donor_donation(
         },
     )
 
+    # Notify donor that their donation has been confirmed and recorded
+    try:
+        await send_notification_to_user(
+            user_id=donor_id,
+            title="Donation Completed",
+            message="Your donation has been recorded successfully.",
+            notification_type="DONATION_COMPLETED",
+            data={
+                "type": "DONATION_COMPLETED",
+                "request_id": request_id,
+                "donor_request_id": donor_request_id,
+                "blood_group": donor_request.get("blood_group", ""),
+                "notification_type": "DONATION_COMPLETED",
+            },
+            urgency="NORMAL",
+            dedup_key=f"donation_completed:{request_id}:{donor_request_id}",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to notify donor of donation completion: {e}")
+
     # -----------------------------------------------------
     # Update blood request
     # -----------------------------------------------------
+
 
     try:
         blood_request = await db.blood_requests.find_one(

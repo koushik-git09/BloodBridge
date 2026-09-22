@@ -1,0 +1,22 @@
+{
+  "name": "BloodBridge - Rapid Blood Supply Network",
+  "short_name": "BloodBridge",
+  "description": "Real-time proximity blood matching with verified donors and nearby blood banks.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1d",
+  "theme_color": "#990000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/bloodbridge-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/bloodbridge-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

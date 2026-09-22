@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from bson import ObjectId
 from app.services.blood_bank_matching_service import (
     create_blood_bank_reservations,
@@ -7,6 +8,9 @@ from app.database.mongodb import db
 from app.services.donor_request_service import (
     create_donor_requests_for_blood_request,
 )
+from app.services.notification_service import send_notification_to_user
+
+logger = logging.getLogger("bloodbridge.requests")
 
 def calculate_remaining_units(request: dict) -> int:
     """Return the unfulfilled units, including both fulfillment sources."""
@@ -276,10 +280,33 @@ async def create_blood_request(
             hospital_location=hospital["location"],
         )
 
+        hospital_name = hospital_user.get("hospitalName") or hospital_user.get("name") or "Hospital"
+        for resv in reservations:
+            try:
+                await send_notification_to_user(
+                    user_id=resv["blood_bank_id"],
+                    title="🚨 New Blood Request",
+                    message=f"{request_data.blood_group} blood is required at {hospital_name}.",
+                    notification_type="BLOOD_REQUEST",
+                    data={
+                        "type": "BLOOD_REQUEST",
+                        "request_id": str(result.inserted_id),
+                        "blood_group": request_data.blood_group,
+                        "urgency": request_data.urgency,
+                        "patient_reference": request_data.patient_reference or "",
+                        "notification_type": "BLOOD_REQUEST",
+                    },
+                    urgency="NORMAL",
+                    dedup_key=f"blood_bank_req:{result.inserted_id}:{resv['blood_bank_id']}",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify blood bank {resv['blood_bank_id']}: {e}")
+
         requested_from_banks = sum(r["units_requested"] for r in reservations)
         likely_shortfall = request_data.units_required - requested_from_banks
 
         new_status = "CHECKING_BLOOD_BANK" if reservations else "DONOR_MATCHING"
+
 
         await db.blood_requests.update_one(
             {"_id": result.inserted_id},
@@ -481,9 +508,30 @@ async def confirm_donation(
         },
     )
 
+    # Notify the donor that their donation is completed and recorded
+    try:
+        await send_notification_to_user(
+            user_id=donor_id,
+            title="Donation Completed",
+            message="Your donation has been recorded successfully.",
+            notification_type="DONATION_COMPLETED",
+            data={
+                "type": "DONATION_COMPLETED",
+                "request_id": request_id,
+                "donor_request_id": donor_request_id,
+                "blood_group": donor_request.get("blood_group", ""),
+                "notification_type": "DONATION_COMPLETED",
+            },
+            urgency="NORMAL",
+            dedup_key=f"donation_completed:{request_id}:{donor_request_id}",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send donation completion notification: {e}")
+
     # -----------------------------------------------------
     # Add one donated unit to blood request
     # -----------------------------------------------------
+
 
     current_donor_units = int(
         blood_request.get(
