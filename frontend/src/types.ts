@@ -86,12 +86,16 @@ export interface BloodRequest {
 
 export interface Notification {
   id: string;
-  type: 'CRITICAL' | 'URGENT' | 'INFO' | 'SUCCESS';
+  type: string;
   title: string;
   message: string;
-  time: string;
+  time?: string;
   read: boolean;
+  sent?: boolean;
+  created_at?: string;
+  data?: Record<string, any>;
 }
+
 
 export interface DonationRecord {
   id: string;

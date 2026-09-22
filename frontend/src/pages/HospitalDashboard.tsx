@@ -18,9 +18,10 @@ import type {
 import HospitalStats from "../components/hospital/HospitalStats";
 import HospitalRequestList from "../components/hospital/HospitalRequestList";
 import HospitalRequestDetails from "../components/hospital/HospitalRequestDetails";
-import HospitalNotificationsModal from "../components/hospital/HospitalNotificationsModal";
+import NotificationCenter from "../components/common/NotificationCenter";
 import CreateRequestFlow from "../components/CreateRequestFlow";
 import { formatTime, formatDate } from "../utils/date";
+
 
 function mapApiRequestToBloodRequest(
   request: Awaited<ReturnType<typeof getHospitalRequests>>[number]
@@ -288,15 +289,6 @@ export default function HospitalDashboard() {
         </div>
       )}
 
-      {/* Notifications Modal */}
-      <HospitalNotificationsModal
-        isOpen={showNotif}
-        onClose={() => setShowNotif(false)}
-        notifications={notifications}
-        onMarkAllRead={() => {
-          setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-        }}
-      />
 
       {/* Create Request Flow Modal */}
       {showCreate && (
@@ -325,19 +317,15 @@ export default function HospitalDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowNotif(true)}
-            className="relative rounded-xl border border-bb-border p-2 text-bb-muted hover:bg-white hover:text-bb-text transition"
-            aria-label="Notifications"
-          >
-            <span className="text-sm">🔔</span>
-            {unreadNotifCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-bb-crimson text-[9px] font-bold text-white">
-                {unreadNotifCount}
-              </span>
-            )}
-          </button>
+          <NotificationCenter
+            onSelectNotification={(notif) => {
+              const reqId = notif.data?.request_id;
+              if (reqId) {
+                const found = requests.find((r) => r.id === reqId);
+                if (found) setSelectedReq(found);
+              }
+            }}
+          />
           <button
             type="button"
             onClick={() => setShowCreate(true)}
@@ -345,6 +333,7 @@ export default function HospitalDashboard() {
           >
             + Create Request
           </button>
+
           <button
             type="button"
             onClick={handleLogout}
