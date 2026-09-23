@@ -71,6 +71,13 @@ export default function BloodBankReservationList({
               <p>
                 <strong>Hospital:</strong> {selectedRes.hospital_name || "Hospital Facility"}
               </p>
+              {selectedRes.hospital_address && (
+                <p className="flex items-start gap-1 text-slate-700">
+                  <strong className="text-bb-crimson shrink-0">📍 Location:</strong>
+                  <span>{selectedRes.hospital_address}</span>
+                </p>
+              )}
+
               <p>
                 <strong>Blood Group:</strong> {selectedRes.blood_group}
               </p>
@@ -196,8 +203,15 @@ export default function BloodBankReservationList({
                       <h3 className="text-sm font-bold text-bb-text">
                         {res.hospital_name || "Hospital Facility"}
                       </h3>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-bb-muted">
+                      {res.hospital_address && (
+                        <p className="mt-0.5 text-xs text-slate-700 flex items-start gap-1 font-medium">
+                          <span className="text-bb-crimson shrink-0">📍</span>
+                          <span>{res.hospital_address}</span>
+                        </p>
+                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-bb-muted">
                         <span>Distance: <strong className="text-bb-text">{res.distance.toFixed(1)} km</strong></span>
+
                         <span>•</span>
                         <span>Requested: <strong className="text-bb-text">{res.units_requested} units</strong></span>
                         <span>•</span>

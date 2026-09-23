@@ -57,9 +57,15 @@ export default function RegisterPage() {
 
     if (!role) return;
 
-    // Strictly require location detection before account creation
+    // Strictly require GPS location detection before account creation
     if (location.latitude === null || location.longitude === null) {
-      setError("Please click 'Use My Current Location' to detect your location before creating an account.");
+      setError("Please click 'Use My Current Location (GPS)' to acquire your coordinates for distance matching.");
+      return;
+    }
+
+    // Require manual address input
+    if (!location.address || !location.address.trim()) {
+      setError("Please enter your detailed physical address (street, area, city) in the address box.");
       return;
     }
 
@@ -74,13 +80,12 @@ export default function RegisterPage() {
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
-          address:
-            location.address.trim() ||
-            `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
+          address: location.address.trim(),
         },
         ...(role === "DONOR" ? { bloodGroup: form.bloodGroup } : {}),
         ...(role === "HOSPITAL" ? { hospitalName: form.hospitalName.trim() } : {}),
       });
+
 
       // Navigate to role-specific login page only upon confirmed successful registration
       navigate(loginPath, {

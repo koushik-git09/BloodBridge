@@ -14,6 +14,8 @@ class DonorRequestResponse(BaseModel):
     hospital_id: str
 
     hospital_name: str | None = None
+    hospital_address: str | None = None
+    hospital_phone: str | None = None
 
     patient_reference: str | None = None
 
