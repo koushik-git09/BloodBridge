@@ -6,7 +6,11 @@ from bson import ObjectId
 import firebase_admin
 from firebase_admin import credentials, messaging
 
-from app.core.config import FIREBASE_CREDENTIALS_FULL_PATH, FIREBASE_CREDENTIALS_JSON
+from app.core.config import (
+    FIREBASE_CREDENTIALS_FULL_PATH,
+    FIREBASE_CREDENTIALS_JSON,
+    FRONTEND_URL,
+)
 from app.database.mongodb import db
 
 logger = logging.getLogger("bloodbridge.notifications")
@@ -249,6 +253,37 @@ async def send_fcm_notification(
     fcm_data["body"] = message
     fcm_data["urgency"] = urgency
 
+    # Determine real frontend target dashboard URL
+    target_path = "/"
+    msg_type = (fcm_data.get("type") or fcm_data.get("notification_type") or "").upper()
+    if (
+        msg_type in ["BLOOD_REQUEST", "RESERVATION_ALERT"]
+        or "BLOOD_BANK" in msg_type
+    ):
+        target_path = "/dashboard/blood-bank"
+    elif (
+        msg_type in ["DONOR_ACCEPTED", "BLOOD_BANK_RESPONSE", "HOSPITAL_ALERT"]
+        or "HOSPITAL" in msg_type
+    ):
+        target_path = "/dashboard/hospital"
+    elif (
+        msg_type in ["EMERGENCY_BLOOD_REQUEST", "DONATION_COMPLETED"]
+        or "DONOR" in msg_type
+    ):
+        target_path = "/dashboard/donor"
+
+    fcm_data["url"] = target_path
+
+    # Construct absolute link for Webpush notification options
+    if FRONTEND_URL and FRONTEND_URL.startswith("http"):
+        target_link = f"{FRONTEND_URL}{target_path}"
+    else:
+        target_link = target_path
+
+    req_id = fcm_data.get("request_id")
+    dedup_tag = f"bb-{req_id}" if req_id else f"bb-alert-{msg_type.lower() or 'general'}"
+    fcm_data["tag"] = dedup_tag
+
     webpush_headers = {
         "Urgency": "high",
         "TTL": "86400",
@@ -257,20 +292,11 @@ async def send_fcm_notification(
     webpush_notification = messaging.WebpushNotification(
         title=title,
         body=message,
-        icon="/bloodbridge-logo.png",
-        badge="/bloodbridge-logo.png",
-        tag=fcm_data.get("request_id", f"bb-{int(datetime.now(timezone.utc).timestamp())}"),
+        icon="/bloodbridge-icon.png",
+        badge="/bloodbridge-badge.png",
+        tag=dedup_tag,
         renotify=True,
     )
-
-    target_link = "/"
-    msg_type = fcm_data.get("type") or fcm_data.get("notification_type") or ""
-    if msg_type in ["EMERGENCY_BLOOD_REQUEST", "DONATION_COMPLETED"] or "donor" in msg_type.lower():
-        target_link = "/donor"
-    elif msg_type in ["BLOOD_REQUEST", "RESERVATION_ALERT"] or "blood_bank" in msg_type.lower():
-        target_link = "/blood-bank"
-    elif msg_type in ["DONOR_ACCEPTED", "BLOOD_BANK_RESPONSE", "HOSPITAL_ALERT"]:
-        target_link = "/hospital"
 
     webpush_config = messaging.WebpushConfig(
         headers=webpush_headers,
@@ -325,12 +351,12 @@ async def send_fcm_notification(
                 if not resp.success:
                     err = resp.exception
                     token = tokens[idx]
-                    logger.warning(f"[FCM] Failed delivery to token {token[:12]}...: {err}")
+                    logger.warning(f"[FCM] Notification send failed for device: {err}")
                     # If unregistered or invalid, prune token
                     if isinstance(err, (messaging.UnregisteredError, messaging.SenderIdMismatchError)):
                         await prune_invalid_token(user_id, token)
 
-        logger.info(f"[FCM] Delivered {success_count}/{len(tokens)} messages to user {user_id}")
+        logger.info(f"[FCM] Notification send succeeded: delivered to {success_count}/{len(tokens)} devices for user {user_id}")
     except Exception as e:
         logger.error(f"[FCM] Error sending multicast message to user {user_id}: {e}")
 
