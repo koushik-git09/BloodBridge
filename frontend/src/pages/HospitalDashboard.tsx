@@ -92,13 +92,13 @@ function mapApiRequestToBloodRequest(
       bloodGroup: d.blood_group,
       availability: d.availability,
       distance: d.distance,
+      address: d.address ?? undefined,
       matchScore: d.match_score,
       responses: d.donation_count,
       lastDonation: formattedLastDonation,
       phone: d.phone ?? null,
       respondedAt: d.responded_at ?? null,
       scores: {
-
         compatibility: 100,
         eligibility: 100,
         distance: Math.max(0, Math.min(100, 100 - d.distance * 4)),
@@ -108,6 +108,19 @@ function mapApiRequestToBloodRequest(
     };
   });
 
+  const bloodBanks = (request.blood_banks || []).map((bb) => ({
+    id: bb.id,
+    bloodBankId: bb.blood_bank_id,
+    bloodBankName: bb.blood_bank_name || "Blood Bank",
+    bloodBankAddress: bb.blood_bank_address || undefined,
+    bloodBankPhone: bb.blood_bank_phone || undefined,
+    bloodGroup: bb.blood_group,
+    unitsRequested: bb.units_requested,
+    unitsConfirmed: bb.units_confirmed,
+    status: bb.status,
+    distance: bb.distance,
+  }));
+
   return {
     id: request.id,
     bloodGroup: request.blood_group,
@@ -115,6 +128,7 @@ function mapApiRequestToBloodRequest(
     urgency: request.urgency as Urgency,
     status: request.status as BloodRequest["status"],
     hospital: request.hospital_name || "Hospital",
+    hospitalAddress: request.hospital_address,
     patient_reference: request.patient_reference,
     createdAt: request.created_at,
     updatedAt: request.updated_at,
@@ -124,9 +138,11 @@ function mapApiRequestToBloodRequest(
     donorUnits: request.donor_units,
     remainingUnits: request.remaining_units,
     donors,
+    bloodBanks,
     timeline,
   };
 }
+
 
 function deriveNotificationsFromRequests(requests: BloodRequest[]): Notification[] {
   const notifs: Notification[] = [];

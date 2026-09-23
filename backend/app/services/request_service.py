@@ -128,8 +128,11 @@ async def serialize_request(
 
             "phone": donor_phone,
 
+            "address": (donor.get("location") or {}).get("address", ""),
+
             "responded_at": to_utc(match.get("responded_at")),
         })
+
 
     if not donor_matches:
         legacy_cursor = db.donor_matches.find(
@@ -167,9 +170,44 @@ async def serialize_request(
                 "last_donation": to_utc(donor.get("lastDonation")),
                 "status": match_status,
                 "phone": donor_phone,
+                "address": (donor.get("location") or {}).get("address", ""),
                 "responded_at": to_utc(match.get("responded_at")),
             })
 
+
+
+    # Query linked blood bank reservations for this request so the hospital can view them
+    blood_bank_matches = []
+    resv_cursor = db.blood_bank_reservations.find(
+        {"request_id": str(request["_id"])}
+    ).sort("distance", 1)
+
+    async for resv in resv_cursor:
+        bb_name = resv.get("blood_bank_name")
+        bb_address = resv.get("blood_bank_address")
+        bb_phone = resv.get("blood_bank_phone")
+        if not bb_name or not bb_address:
+            try:
+                bb_user = await db.users.find_one({"_id": ObjectId(resv["blood_bank_id"])})
+                if bb_user:
+                    bb_name = bb_name or bb_user.get("name", "Blood Bank")
+                    bb_address = bb_address or (bb_user.get("location") or {}).get("address", "")
+                    bb_phone = bb_phone or bb_user.get("phone", "")
+            except Exception:
+                pass
+
+        blood_bank_matches.append({
+            "id": str(resv["_id"]),
+            "blood_bank_id": resv["blood_bank_id"],
+            "blood_bank_name": bb_name or "Blood Bank",
+            "blood_bank_address": bb_address or "",
+            "blood_bank_phone": bb_phone or "",
+            "blood_group": resv["blood_group"],
+            "units_requested": resv["units_requested"],
+            "units_confirmed": resv.get("units_confirmed", 0),
+            "status": resv["status"],
+            "distance": float(resv.get("distance", 0.0)),
+        })
 
     return {
         "id": str(
@@ -182,6 +220,11 @@ async def serialize_request(
 
         "hospital_name": request.get(
             "hospital_name"
+        ),
+
+        "hospital_address": request.get(
+            "hospital_address",
+            "",
         ),
 
         "patient_reference": request[
@@ -214,8 +257,6 @@ async def serialize_request(
             0,
         ),
 
-        # Calculate rather than trust a legacy stored value so every response
-        # reflects all confirmed blood-bank and donor contributions.
         "remaining_units": calculate_remaining_units(request),
 
         "notes": request.get(
@@ -238,18 +279,27 @@ async def serialize_request(
         ),
 
         "donors": donor_matches,
+        "blood_banks": blood_bank_matches,
     }
+
 
 async def create_blood_request(
     request_data,
     hospital_user: dict,
 ):
+    hospital = await db.users.find_one({
+        "_id": ObjectId(hospital_user["id"]),
+        "role": "HOSPITAL",
+    })
+    h_address = (hospital.get("location") or {}).get("address", "") if hospital else ""
+
     request_document = {
         "hospital_id": hospital_user["id"],
         "hospital_name": hospital_user.get(
             "hospitalName",
             hospital_user.get("name"),
         ),
+        "hospital_address": h_address,
         "patient_reference": request_data.patient_reference,
         "blood_group": request_data.blood_group,
         "units_required": request_data.units_required,
@@ -266,11 +316,6 @@ async def create_blood_request(
     result = await db.blood_requests.insert_one(request_document)
     request_document["_id"] = result.inserted_id
 
-    hospital = await db.users.find_one({
-        "_id": ObjectId(hospital_user["id"]),
-        "role": "HOSPITAL",
-    })
-
     if hospital and hospital.get("location"):
         reservations = await create_blood_bank_reservations(
             request_id=str(result.inserted_id),
@@ -283,16 +328,20 @@ async def create_blood_request(
         hospital_name = hospital_user.get("hospitalName") or hospital_user.get("name") or "Hospital"
         for resv in reservations:
             try:
+                loc_txt = f" Location: {h_address} ({resv.get('distance', 0)} km away)." if h_address else f" ({resv.get('distance', 0)} km away)."
                 await send_notification_to_user(
                     user_id=resv["blood_bank_id"],
                     title="🚨 New Blood Request",
-                    message=f"{request_data.blood_group} blood is required at {hospital_name}.",
+                    message=f"{request_data.blood_group} blood is required at {hospital_name}.{loc_txt}",
                     notification_type="BLOOD_REQUEST",
                     data={
                         "type": "BLOOD_REQUEST",
                         "request_id": str(result.inserted_id),
                         "blood_group": request_data.blood_group,
                         "urgency": request_data.urgency,
+                        "hospital_name": hospital_name,
+                        "hospital_address": h_address,
+                        "distance": str(resv.get("distance", "")),
                         "patient_reference": request_data.patient_reference or "",
                         "notification_type": "BLOOD_REQUEST",
                     },
@@ -301,6 +350,7 @@ async def create_blood_request(
                 )
             except Exception as e:
                 logger.warning(f"Failed to notify blood bank {resv['blood_bank_id']}: {e}")
+
 
         requested_from_banks = sum(r["units_requested"] for r in reservations)
         likely_shortfall = request_data.units_required - requested_from_banks

@@ -60,28 +60,38 @@ def calculate_distance_km(
     Calculate approximate distance between two coordinates
     using the Haversine formula.
     """
+    try:
+        lat1_f = float(latitude_1)
+        lon1_f = float(longitude_1)
+        lat2_f = float(latitude_2)
+        lon2_f = float(longitude_2)
+    except (TypeError, ValueError):
+        return 9999.0
 
     earth_radius_km = 6371.0
 
-    lat1 = radians(latitude_1)
-    lon1 = radians(longitude_1)
+    r_lat1 = radians(lat1_f)
+    r_lon1 = radians(lon1_f)
+    r_lat2 = radians(lat2_f)
+    r_lon2 = radians(lon2_f)
 
-    lat2 = radians(latitude_2)
-    lon2 = radians(longitude_2)
-
-    delta_lat = lat2 - lat1
-    delta_lon = lon2 - lon1
+    delta_lat = r_lat2 - r_lat1
+    delta_lon = r_lon2 - r_lon1
 
     a = (
         sin(delta_lat / 2) ** 2
-        + cos(lat1)
-        * cos(lat2)
+        + cos(r_lat1)
+        * cos(r_lat2)
         * sin(delta_lon / 2) ** 2
     )
+
+    # Clamp a to [0.0, 1.0] to prevent floating point inaccuracies causing math domain errors
+    a = min(1.0, max(0.0, a))
 
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
 
     return round(earth_radius_km * c, 2)
+
 
 
 # ---------------------------------------------------------
@@ -261,9 +271,13 @@ async def create_blood_bank_reservations(
             "units_confirmed": 0,
             "status": "PENDING",
             "distance": bank["distance"],
+            "blood_bank_name": bank.get("name", "Blood Bank"),
+            "blood_bank_address": (bank.get("location") or {}).get("address", ""),
+            "hospital_address": (hospital_location or {}).get("address", ""),
             "created_at": datetime.now(timezone.utc),
             "responded_at": None,
         }
+
 
         result = await db.blood_bank_reservations.insert_one(
             reservation_document

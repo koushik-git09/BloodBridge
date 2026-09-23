@@ -43,19 +43,32 @@ export interface Donor {
   bloodGroup: BloodGroup;
   availability: DonorAvailability;
   distance: number;
+  address?: string;
   matchScore: number;
   responses: number;
   lastDonation: string;
   phone?: string | null;
   respondedAt?: string | null;
   scores: {
-
     compatibility: number;
     eligibility: number;
     distance: number;
     availability: number;
     reliability: number;
   };
+}
+
+export interface BloodBankReservationItem {
+  id: string;
+  bloodBankId: string;
+  bloodBankName: string;
+  bloodBankAddress?: string;
+  bloodBankPhone?: string;
+  bloodGroup: BloodGroup;
+  unitsRequested: number;
+  unitsConfirmed: number;
+  status: string;
+  distance: number;
 }
 
 export interface TimelineEvent {
@@ -69,11 +82,11 @@ export interface BloodRequest {
   id: string;
   patient_reference?: string;
   bloodGroup: BloodGroup;
-
   unitsRequired: number;
   urgency: Urgency;
   status: RequestStatus;
   hospital: string;
+  hospitalAddress?: string;
   createdAt: string;
   updatedAt?: string;
   fulfilledAt?: string;
@@ -82,7 +95,9 @@ export interface BloodRequest {
   remainingUnits: number;
   timeline: TimelineEvent[];
   donors?: Donor[];
+  bloodBanks?: BloodBankReservationItem[];
 }
+
 
 export interface Notification {
   id: string;

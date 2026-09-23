@@ -53,10 +53,13 @@ async def create_donor_requests_for_blood_request(
         if existing:
             continue
 
+        hospital_address = (hospital_location or {}).get("address", "")
         donor_request = {
             "request_id": request_id,
             "donor_id": donor_id,
             "hospital_id": hospital_id,
+            "hospital_name": hospital_name,
+            "hospital_address": hospital_address,
             "blood_group": blood_group,
 
             "distance": donor["distance"],
@@ -79,10 +82,11 @@ async def create_donor_requests_for_blood_request(
 
         # Dispatch FCM and in-app emergency/standard notification to matched donor
         notif_title = "🚨 EMERGENCY BLOOD REQUEST" if is_emergency else "New Blood Request"
+        loc_suffix = f" Location: {hospital_address} ({donor['distance']} km away)." if hospital_address else f" ({donor['distance']} km away)."
         notif_msg = (
-            f"{blood_group} blood is urgently required at {hospital_name}."
+            f"{blood_group} blood is urgently required at {hospital_name}.{loc_suffix}"
             if is_emergency
-            else f"{blood_group} blood is required at {hospital_name}."
+            else f"{blood_group} blood is required at {hospital_name}.{loc_suffix}"
         )
         notif_type = "EMERGENCY_BLOOD_REQUEST" if is_emergency else "BLOOD_REQUEST"
 
@@ -98,6 +102,9 @@ async def create_donor_requests_for_blood_request(
                     "donor_request_id": str(result.inserted_id),
                     "blood_group": blood_group,
                     "urgency": urgency,
+                    "hospital_name": hospital_name,
+                    "hospital_address": hospital_address,
+                    "distance": str(donor["distance"]),
                     "patient_reference": patient_ref,
                     "notification_type": notif_type,
                 },
@@ -106,6 +113,7 @@ async def create_donor_requests_for_blood_request(
             )
         except Exception as e:
             logger.warning(f"Failed to dispatch notification to donor {donor_id}: {e}")
+
 
     return created_requests
 
@@ -150,26 +158,37 @@ async def get_donor_requests_for_donor(
             blood_request = None
 
         if blood_request:
-
             request["hospital_name"] = blood_request.get(
                 "hospital_name"
             )
-
+            request["hospital_address"] = blood_request.get(
+                "hospital_address"
+            ) or request.get("hospital_address")
             request["urgency"] = blood_request.get(
                 "urgency"
             )
-
             request["units_required"] = blood_request.get(
                 "units_required"
             )
-
             request["patient_reference"] = blood_request.get(
                 "patient_reference"
             )
 
+        if not request.get("hospital_address"):
+            try:
+                h_user = await db.users.find_one({"_id": ObjectId(request["hospital_id"])})
+                if h_user:
+                    request["hospital_address"] = (h_user.get("location") or {}).get("address", "")
+                    request["hospital_phone"] = h_user.get("phone")
+                    if not request.get("hospital_name"):
+                        request["hospital_name"] = h_user.get("hospitalName", h_user.get("name"))
+            except Exception:
+                pass
+
         requests.append(request)
 
     return requests
+
 
 
 async def respond_to_donor_request(

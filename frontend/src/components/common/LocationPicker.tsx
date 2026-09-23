@@ -1,22 +1,59 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useGeolocation } from "../../hooks/useGeolocation";
 
 interface LocationPickerProps {
   onLocationChange: (location: { latitude: number; longitude: number; address: string }) => void;
   initialAddress?: string;
+  required?: boolean;
 }
 
-export default function LocationPicker({ onLocationChange, initialAddress = "" }: LocationPickerProps) {
-  const { latitude, longitude, address, loading, error, success, requestLocation, setManualAddress } =
-    useGeolocation();
+export default function LocationPicker({
+  onLocationChange,
+  initialAddress = "",
+  required = true,
+}: LocationPickerProps) {
+  const {
+    latitude,
+    longitude,
+    address: geoAddress,
+    loading,
+    error,
+    success,
+    requestLocation,
+  } = useGeolocation();
 
-  const lastReportedRef = React.useRef<string>("");
+  const [manualAddress, setManualAddress] = useState(initialAddress);
+  const [addressTouched, setAddressTouched] = useState(false);
+  const lastReportedRef = useRef<string>("");
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Auto-fill manual address from reverse geocoding only if the user hasn't manually edited it yet
+  useEffect(() => {
+    if (success && geoAddress && !addressTouched && !manualAddress) {
+      setManualAddress(geoAddress);
+    }
+  }, [success, geoAddress, addressTouched, manualAddress]);
+
+  // Report changes to parent whenever lat, lng, or manualAddress updates
+  useEffect(() => {
+    if (latitude !== null && longitude !== null) {
+      const activeAddress = manualAddress.trim() || geoAddress || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      const key = `${latitude},${longitude},${activeAddress}`;
+      if (lastReportedRef.current !== key) {
+        lastReportedRef.current = key;
+        onLocationChange({
+          latitude,
+          longitude,
+          address: activeAddress,
+        });
+      }
+    }
+  }, [latitude, longitude, manualAddress, geoAddress, onLocationChange]);
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    setAddressTouched(true);
     const val = e.target.value;
     setManualAddress(val);
     if (latitude !== null && longitude !== null) {
-      lastReportedRef.current = `${latitude},${longitude},${val}`;
       onLocationChange({
         latitude,
         longitude,
@@ -25,119 +62,128 @@ export default function LocationPicker({ onLocationChange, initialAddress = "" }
     }
   };
 
-  const handleFetchLocation = () => {
-    requestLocation();
-  };
-
-  // Trigger parent update when location succeeds without re-render looping
-  React.useEffect(() => {
-    if (success && latitude !== null && longitude !== null) {
-      const key = `${latitude},${longitude},${address}`;
-      if (lastReportedRef.current !== key) {
-        lastReportedRef.current = key;
-        onLocationChange({
-          latitude,
-          longitude,
-          address: address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        });
-      }
-    }
-  }, [success, latitude, longitude, address, onLocationChange]);
-
   return (
-    <div className="space-y-3 rounded-2xl border border-bb-border bg-white/70 p-4 sm:p-5 backdrop-blur-md">
-      <div className="space-y-1">
-        <label className="block text-sm font-semibold text-bb-text">
-          Location
-        </label>
-        <p className="text-xs text-bb-muted">
-          Please provide the location to continue
+    <div className="space-y-4 rounded-2xl border border-bb-border bg-white/80 p-5 shadow-sm backdrop-blur-md">
+      {/* Header */}
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-bold text-bb-text flex items-center gap-1.5">
+            <span>Location & Address Details</span>
+            {required && <span className="text-bb-crimson">*</span>}
+          </label>
+          <span className="text-[11px] font-medium text-bb-muted">
+            Used for GPS distance matching & dispatch
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-bb-muted">
+          Your GPS coordinates ensure emergency distance calculations work accurately, while your manual address helps donors and hospitals navigate directly to you.
         </p>
       </div>
 
-      {!success && !loading && (
-        <button
-          type="button"
-          onClick={handleFetchLocation}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-bb-crimson px-4 py-3 font-semibold text-white transition hover:bg-bb-crimson-bright shadow-sm active:scale-[0.99]"
-        >
-          <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Use My Current Location
-        </button>
-      )}
+      {/* 1. GPS Coordinates Detection */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold uppercase tracking-wider text-bb-muted">
+          Step 1: Detect GPS Coordinates
+        </label>
 
-      {loading && (
-        <div className="flex items-center justify-center gap-3 rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-sm font-medium text-amber-700">
-          <svg className="size-5 animate-spin text-amber-600" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Acquiring device geolocation...
-        </div>
-      )}
+        {!success && !loading && (
+          <button
+            type="button"
+            onClick={requestLocation}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-bb-crimson px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-bb-crimson-bright active:scale-[0.99]"
+          >
+            <svg className="size-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Use My Current Location (GPS)
+          </button>
+        )}
 
-      {success && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-sm text-emerald-800">
-            <div className="flex items-center gap-2 font-semibold">
-              <svg className="size-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>✓ Location detected</span>
+        {loading && (
+          <div className="flex items-center justify-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+            <svg className="size-4 animate-spin text-amber-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Acquiring high-accuracy GPS coordinates...</span>
+          </div>
+        )}
+
+        {success && latitude !== null && longitude !== null && (
+          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+            <div className="flex items-center gap-2">
+              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-black">
+                ✓
+              </span>
+              <div>
+                <p className="font-bold">GPS Location Verified</p>
+                <p className="font-mono text-[11px] text-emerald-700">
+                  Lat: {latitude.toFixed(5)}, Lng: {longitude.toFixed(5)}
+                </p>
+              </div>
             </div>
             <button
               type="button"
-              onClick={handleFetchLocation}
-              className="text-xs font-semibold text-emerald-700 underline hover:text-emerald-900"
+              onClick={requestLocation}
+              className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
             >
               Re-detect
             </button>
           </div>
-          {address && (
-            <p className="text-xs text-bb-muted truncate">
-              Detected: <span className="font-medium text-bb-text">{address}</span>
-            </p>
-          )}
-        </div>
-      )}
+        )}
 
-      {error && (
-        <div className="space-y-2">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-            <p className="font-medium">{error}</p>
-            <p className="mt-1 text-xs text-red-600">
-              Location permission is required to find nearby donors and blood banks.
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 space-y-1.5">
+            <p className="font-bold">{error}</p>
+            <p className="text-[11px] text-red-600">
+              Please allow location permission in your browser to calculate proximity distance.
             </p>
             <button
               type="button"
-              onClick={handleFetchLocation}
-              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition"
+              onClick={requestLocation}
+              className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition"
             >
-              <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Retry Location Permission
+              Retry GPS
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-bb-muted mb-1">
-          Address / Landmark details (Optional)
-        </label>
-        <input
-          type="text"
-          value={address || initialAddress}
+      {/* 2. Manual Physical Address Input */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-bold uppercase tracking-wider text-bb-muted">
+            Step 2: Enter Physical Address / Landmark {required && <span className="text-bb-crimson">*</span>}
+          </label>
+          {success && geoAddress && (
+            <button
+              type="button"
+              onClick={() => {
+                setManualAddress(geoAddress);
+                setAddressTouched(true);
+                if (latitude !== null && longitude !== null) {
+                  onLocationChange({ latitude, longitude, address: geoAddress });
+                }
+              }}
+              className="text-[11px] font-semibold text-bb-teal hover:underline"
+            >
+              Use Detected Address
+            </button>
+          )}
+        </div>
+        <textarea
+          rows={2}
+          value={manualAddress}
           onChange={handleAddressChange}
-          placeholder="e.g. Apollo Hospital Campus, Greams Road, Chennai"
-          className="w-full rounded-xl border border-bb-border bg-white px-4 py-2.5 text-sm text-bb-text outline-none focus:ring-2 focus:ring-bb-crimson"
+          required={required}
+          placeholder="e.g. Apollo Hospital Campus, Greams Road, Thousand Lights, Chennai - 600006"
+          className="w-full rounded-xl border border-bb-border bg-white p-3 text-xs sm:text-sm text-bb-text outline-none transition focus:border-bb-crimson focus:ring-2 focus:ring-bb-crimson/20"
         />
+        <p className="text-[11px] text-bb-muted">
+          Provide complete details: Building name, street, area, city, and pincode.
+        </p>
       </div>
     </div>
   );
 }
-

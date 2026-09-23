@@ -18,7 +18,7 @@ export default function HospitalRequestDetails({
   onConfirmDonation,
   confirmingDonorRequestId,
 }: HospitalRequestDetailsProps) {
-  const [activeTab, setActiveTab] = useState<"timeline" | "donors" | "network">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "donors" | "blood_banks" | "network">("timeline");
 
   if (!request) {
     return (
@@ -50,6 +50,12 @@ export default function HospitalRequestDetails({
               <p className="text-xs text-bb-muted mt-0.5">
                 Created: {formatDateTime(request.createdAt)} • {request.hospital}
               </p>
+              {request.hospitalAddress && (
+                <p className="text-xs text-slate-700 font-medium flex items-center gap-1 mt-0.5">
+                  <span className="text-bb-crimson">📍</span>
+                  <span>{request.hospitalAddress}</span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -87,11 +93,11 @@ export default function HospitalRequestDetails({
         </div>
 
         {/* Navigation Tabs inside details */}
-        <div className="flex border-b border-bb-border gap-4 pt-1">
+        <div className="flex border-b border-bb-border gap-4 pt-1 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("timeline")}
-            className={`pb-2 text-xs font-bold transition border-b-2 ${
+            className={`pb-2 text-xs font-bold transition whitespace-nowrap border-b-2 ${
               activeTab === "timeline"
                 ? "border-bb-crimson text-bb-crimson"
                 : "border-transparent text-bb-muted hover:text-bb-text"
@@ -102,7 +108,7 @@ export default function HospitalRequestDetails({
           <button
             type="button"
             onClick={() => setActiveTab("donors")}
-            className={`pb-2 text-xs font-bold transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2 text-xs font-bold transition whitespace-nowrap border-b-2 flex items-center gap-1.5 ${
               activeTab === "donors"
                 ? "border-bb-crimson text-bb-crimson"
                 : "border-transparent text-bb-muted hover:text-bb-text"
@@ -117,8 +123,24 @@ export default function HospitalRequestDetails({
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("blood_banks")}
+            className={`pb-2 text-xs font-bold transition whitespace-nowrap border-b-2 flex items-center gap-1.5 ${
+              activeTab === "blood_banks"
+                ? "border-bb-crimson text-bb-crimson"
+                : "border-transparent text-bb-muted hover:text-bb-text"
+            }`}
+          >
+            <span>Nearby Blood Banks</span>
+            {request.bloodBanks && request.bloodBanks.length > 0 && (
+              <span className="size-4 rounded-full bg-bb-teal text-[10px] text-white flex items-center justify-center">
+                {request.bloodBanks.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("network")}
-            className={`pb-2 text-xs font-bold transition border-b-2 ${
+            className={`pb-2 text-xs font-bold transition whitespace-nowrap border-b-2 ${
               activeTab === "network"
                 ? "border-bb-crimson text-bb-crimson"
                 : "border-transparent text-bb-muted hover:text-bb-text"
@@ -148,6 +170,76 @@ export default function HospitalRequestDetails({
           />
         )}
 
+        {activeTab === "blood_banks" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-bb-muted">
+                Nearby Blood Banks Contacted
+              </h3>
+              <span className="text-xs text-bb-muted font-medium">
+                {request.bloodBanks?.length || 0} Facilities Contacted
+              </span>
+            </div>
+
+            {(!request.bloodBanks || request.bloodBanks.length === 0) ? (
+              <div className="rounded-xl border border-dashed border-bb-border p-8 text-center text-xs text-bb-muted">
+                No nearby blood bank reservations for this request.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {request.bloodBanks.map((bank) => (
+                  <div
+                    key={bank.id}
+                    className="glass rounded-xl p-4 border border-bb-border space-y-2 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-bb-text">{bank.bloodBankName}</h4>
+                        {bank.bloodBankAddress && (
+                          <p className="mt-0.5 text-xs text-slate-700 font-medium flex items-start gap-1">
+                            <span className="text-bb-crimson shrink-0">📍</span>
+                            <span>{bank.bloodBankAddress}</span>
+                          </p>
+                        )}
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-bb-muted font-mono">
+                          <span>Proximity: <strong className="text-bb-text font-sans">{bank.distance.toFixed(1)} km</strong></span>
+                          <span>•</span>
+                          <span>Requested: <strong className="text-bb-text font-sans">{bank.unitsRequested} units</strong></span>
+                          {bank.unitsConfirmed > 0 && (
+                            <>
+                              <span>•</span>
+                              <span>Confirmed: <strong className="text-emerald-700 font-sans">{bank.unitsConfirmed} units</strong></span>
+                            </>
+                          )}
+                          {bank.bloodBankPhone && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-800">📞 {bank.bloodBankPhone}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                          bank.status === "CONFIRMED"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : bank.status === "PARTIAL"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : bank.status === "PENDING"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-red-50 text-red-700 border-red-200"
+                        }`}
+                      >
+                        {bank.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "network" && (
           <div className="flex flex-col items-center justify-center py-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-bb-muted mb-4 self-start">
@@ -160,3 +252,4 @@ export default function HospitalRequestDetails({
     </div>
   );
 }
+

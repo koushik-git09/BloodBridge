@@ -15,6 +15,9 @@ export interface BloodBankReservationResponse {
   blood_bank_id: string;
   hospital_id: string;
   hospital_name?: string | null;
+  hospital_address?: string | null;
+  blood_bank_name?: string | null;
+  blood_bank_address?: string | null;
   urgency?: string | null;
   blood_group: BloodGroup;
   units_requested: number;
@@ -24,6 +27,7 @@ export interface BloodBankReservationResponse {
   created_at: string;
   responded_at?: string | null;
 }
+
 
 export type ReservationAction =
   | "CONFIRM"

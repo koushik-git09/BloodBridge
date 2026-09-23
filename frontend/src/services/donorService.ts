@@ -7,6 +7,8 @@ export interface DonorRequest {
   hospital_id: string;
 
   hospital_name?: string | null;
+  hospital_address?: string | null;
+  hospital_phone?: string | null;
   patient_reference?: string | null;
 
   blood_group: string;
@@ -22,6 +24,7 @@ export interface DonorRequest {
   created_at: string;
   responded_at?: string | null;
 }
+
 
 /**
  * Get blood requests assigned to the logged-in donor.

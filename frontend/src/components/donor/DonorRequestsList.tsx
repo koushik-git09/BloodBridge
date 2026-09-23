@@ -53,7 +53,13 @@ export default function DonorRequestsList({
                   <h3 className="text-base font-bold text-bb-text">
                     {request.hospital_name || "Emergency Blood Request"}
                   </h3>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-bb-muted">
+                  {request.hospital_address && (
+                    <p className="mt-0.5 text-xs text-slate-700 flex items-start gap-1 font-medium">
+                      <span className="text-bb-crimson shrink-0">📍</span>
+                      <span>{request.hospital_address}</span>
+                    </p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-bb-muted">
                     {request.patient_reference && (
                       <span>Ref: <span className="font-mono text-bb-dim">{request.patient_reference}</span></span>
                     )}
@@ -61,8 +67,17 @@ export default function DonorRequestsList({
                     <span>Distance: <span className="font-semibold text-bb-text">{request.distance.toFixed(1)} km</span></span>
                     <span>•</span>
                     <span>Match: <span className="font-semibold text-bb-teal">{request.match_score}%</span></span>
+                    {request.hospital_phone && isAccepted && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          📞 {request.hospital_phone}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
+
               </div>
 
               <div className="flex items-center gap-2">

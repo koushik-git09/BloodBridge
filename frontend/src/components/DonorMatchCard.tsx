@@ -62,14 +62,20 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
               <div className="mt-0.5 flex flex-wrap items-center gap-2">
                 <BloodGroupBadge group={donor.bloodGroup} size="sm" />
                 <span className="font-mono text-xs text-bb-muted">{donor.distance} km away</span>
+                {donor.address && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-bb-muted max-w-[220px] sm:max-w-xs truncate" title={donor.address}>
+                    <span className="text-bb-crimson">📍</span>
+                    <span className="truncate">{donor.address}</span>
+                  </span>
+                )}
                 {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
                   <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                     📱 {donor.phone}
                   </span>
                 )}
               </div>
-
             </div>
+
           </div>
           <div className="text-right shrink-0">
             <span className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold ${response.className}`}>
@@ -96,6 +102,17 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
             <span className="text-bb-border">·</span>
             <span>{donor.responses} responses</span>
           </div>
+
+          {donor.address && (
+            <div className="rounded-xl bg-slate-50 border border-bb-border/70 p-3 text-xs text-bb-text space-y-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-bb-muted">Registered Donor Address</p>
+              <p className="font-medium text-slate-800 flex items-start gap-1.5">
+                <span className="text-bb-crimson shrink-0">📍</span>
+                <span>{donor.address}</span>
+              </p>
+            </div>
+          )}
+
 
           {/* Donor Mobile Contact Section (Visible ONLY after Donor accepts) */}
           {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
