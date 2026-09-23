@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from datetime import datetime, timezone
 from bson import ObjectId
 import firebase_admin
@@ -41,19 +42,31 @@ def init_firebase_admin() -> bool:
             except Exception as e:
                 logger.error(f"[FCM] Failed to initialize Firebase from FIREBASE_CREDENTIALS_JSON: {e}")
 
-        # 2. Try initializing from local file path
-        cred_path = FIREBASE_CREDENTIALS_FULL_PATH
-        if not cred_path.exists():
+        # 2. Try initializing from file paths (supports local credentials/, Render root, and /etc/secrets/)
+        candidate_paths = [
+            FIREBASE_CREDENTIALS_FULL_PATH,
+            Path("firebase-service-account.json"),
+            Path("/etc/secrets/firebase-service-account.json"),
+        ]
+
+        found_path = None
+        for p in candidate_paths:
+            if p.exists():
+                found_path = p
+                break
+
+        if not found_path:
             logger.warning(
-                f"[FCM] Firebase credentials file not found at: {cred_path}. Push notifications will be disabled."
+                f"[FCM] Firebase credentials file not found (checked: {[str(p) for p in candidate_paths]}). Push notifications will be disabled."
             )
             return False
 
-        cred = credentials.Certificate(str(cred_path))
+        cred = credentials.Certificate(str(found_path))
         firebase_admin.initialize_app(cred)
         _firebase_initialized = True
-        logger.info("[FCM] Firebase Admin SDK initialized successfully from file.")
+        logger.info(f"[FCM] Firebase Admin SDK initialized successfully from {found_path}.")
         return True
+
     except Exception as e:
         logger.error(f"[FCM] Failed to initialize Firebase Admin SDK: {e}")
         return False
