@@ -250,7 +250,7 @@ async def send_fcm_notification(
     fcm_data["urgency"] = urgency
 
     webpush_headers = {
-        "Urgency": "high" if is_emergency else "normal",
+        "Urgency": "high",
         "TTL": "86400",
     }
 
@@ -259,24 +259,34 @@ async def send_fcm_notification(
         body=message,
         icon="/bloodbridge-logo.png",
         badge="/bloodbridge-logo.png",
-        tag=fcm_data.get("request_id", "bloodbridge-alert"),
+        tag=fcm_data.get("request_id", f"bb-{int(datetime.now(timezone.utc).timestamp())}"),
         renotify=True,
     )
+
+    target_link = "/"
+    msg_type = fcm_data.get("type") or fcm_data.get("notification_type") or ""
+    if msg_type in ["EMERGENCY_BLOOD_REQUEST", "DONATION_COMPLETED"] or "donor" in msg_type.lower():
+        target_link = "/donor"
+    elif msg_type in ["BLOOD_REQUEST", "RESERVATION_ALERT"] or "blood_bank" in msg_type.lower():
+        target_link = "/blood-bank"
+    elif msg_type in ["DONOR_ACCEPTED", "BLOOD_BANK_RESPONSE", "HOSPITAL_ALERT"]:
+        target_link = "/hospital"
 
     webpush_config = messaging.WebpushConfig(
         headers=webpush_headers,
         notification=webpush_notification,
         data=fcm_data,
+        fcm_options=messaging.WebpushFCMOptions(link=target_link),
     )
 
     android_config = messaging.AndroidConfig(
-        priority="high" if is_emergency else "normal",
+        priority="high",
         notification=messaging.AndroidNotification(
             title=title,
             body=message,
             sound="default",
-            priority="max" if is_emergency else "high",
-            channel_id="bloodbridge_emergency" if is_emergency else "bloodbridge_general",
+            priority="max",
+            channel_id="bloodbridge_emergency",
         ),
         data=fcm_data,
     )

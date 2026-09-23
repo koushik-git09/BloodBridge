@@ -16,6 +16,10 @@ import BloodBankStats from "../components/bloodbank/BloodBankStats";
 import BloodBankReservationList from "../components/bloodbank/BloodBankReservationList";
 import BloodBankInventoryEditor from "../components/bloodbank/BloodBankInventoryEditor";
 import NotificationCenter from "../components/common/NotificationCenter";
+import {
+  enableNotifications,
+  getBrowserNotificationPermission,
+} from "../services/notificationService";
 
 
 const EMPTY_INVENTORY: Record<BloodGroup, number> = {
@@ -44,6 +48,19 @@ export default function BloodBankDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Push notification state
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [pushDismissed, setPushDismissed] = useState(false);
+
+  useEffect(() => {
+    const perm = getBrowserNotificationPermission();
+    setPushPermission(perm);
+    if (perm === "granted") {
+      enableNotifications().catch(() => {});
+    }
+  }, []);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -194,13 +211,66 @@ export default function BloodBankDashboard() {
               Live inventory tracking and automated hospital reservation routing
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {pushPermission === "granted" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Push Alerts Active
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5 rounded-full bg-bb-teal/10 border border-bb-teal/30 px-3 py-1 text-xs font-mono font-bold text-bb-teal uppercase tracking-wider">
               <span className="size-1.5 rounded-full bg-bb-teal animate-blink" />
               Active Inventory Sync
             </span>
           </div>
         </div>
+
+        {/* Mobile Push Alerts Activation Banner */}
+        {pushPermission === "default" && !pushDismissed && (
+          <div className="rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-950/60 via-red-900/30 to-neutral-900/80 p-4 sm:p-5 backdrop-blur-md shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600/20 border border-red-500/40 text-2xl text-red-400">
+                🔔
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base">
+                  Enable Emergency Push Alerts
+                </h3>
+                <p className="text-xs text-neutral-300 mt-0.5 leading-relaxed">
+                  Receive instant hospital blood reservations directly on your device lock screen, even when your browser is closed.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => setPushDismissed(true)}
+                className="text-xs font-medium text-neutral-400 hover:text-neutral-200 px-2 py-1.5"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setEnablingPush(true);
+                  const res = await enableNotifications();
+                  setEnablingPush(false);
+                  const newPerm = getBrowserNotificationPermission();
+                  setPushPermission(newPerm);
+                  if (res.success) {
+                    showToast("Push alerts activated! You will receive hospital requests when your device is locked.");
+                  } else {
+                    showToast(res.error || "Could not enable notifications. Check browser settings.");
+                  }
+                }}
+                disabled={enablingPush}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 shadow-lg shadow-red-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {enablingPush ? "Activating..." : "Enable Push Alerts"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Global Error Alert */}
         {error && (

@@ -1,6 +1,7 @@
 {
   "name": "BloodBridge - Rapid Blood Supply Network",
   "short_name": "BloodBridge",
+  "gcm_sender_id": "103953800507",
   "description": "Real-time proximity blood matching with verified donors and nearby blood banks.",
   "start_url": "/",
   "display": "standalone",

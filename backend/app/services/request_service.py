@@ -352,25 +352,37 @@ async def create_blood_request(
                 logger.warning(f"Failed to notify blood bank {resv['blood_bank_id']}: {e}")
 
 
-        requested_from_banks = sum(r["units_requested"] for r in reservations)
-        likely_shortfall = request_data.units_required - requested_from_banks
+        if reservations:
+            # Blood banks found with stock: wait for blood banks to respond!
+            # Donors must NOT be contacted at this stage.
+            new_status = "CHECKING_BLOOD_BANK"
+            await db.blood_requests.update_one(
+                {"_id": result.inserted_id},
+                {"$set": {"status": new_status}}
+            )
+            request_document["status"] = new_status
+        else:
+            # No blood banks with inventory in range: fall back directly to donor matching
+            new_status = "DONOR_MATCHING"
+            await db.blood_requests.update_one(
+                {"_id": result.inserted_id},
+                {"$set": {"status": new_status}}
+            )
+            request_document["status"] = new_status
 
-        new_status = "CHECKING_BLOOD_BANK" if reservations else "DONOR_MATCHING"
-
-
-        await db.blood_requests.update_one(
-            {"_id": result.inserted_id},
-            {"$set": {"status": new_status}}
-        )
-        request_document["status"] = new_status
-
-        if likely_shortfall > 0:
             await create_donor_requests_for_blood_request(
                 request_id=str(result.inserted_id),
                 hospital_id=hospital_user["id"],
                 blood_group=request_data.blood_group,
                 hospital_location=hospital["location"],
             )
+    else:
+        new_status = "DONOR_MATCHING"
+        await db.blood_requests.update_one(
+            {"_id": result.inserted_id},
+            {"$set": {"status": new_status}}
+        )
+        request_document["status"] = new_status
 
     return await serialize_request(request_document)
 

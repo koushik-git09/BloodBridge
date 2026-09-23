@@ -75,8 +75,13 @@ export async function enableNotifications(): Promise<{
       };
     }
 
-    // Register with backend
-    await registerFCMToken(token, "web");
+    // Register with backend (detect mobile vs web)
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const platform = isMobile ? "mobile" : "web";
+
+    await registerFCMToken(token, platform);
     localStorage.setItem("bloodbridge_fcm_token", token);
 
     return { success: true, token };
