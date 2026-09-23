@@ -23,7 +23,7 @@ let messagingPromise: Promise<Messaging | null> | null = null;
 export function getFirebaseApp(): FirebaseApp | null {
   if (app) return app;
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.warn("[FCM] Firebase Web configuration is missing in frontend/.env.local");
+    console.warn("[FCM] Firebase messaging configuration is incomplete.");
     return null;
   }
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -35,6 +35,7 @@ export async function getFirebaseMessaging(): Promise<Messaging | null> {
 
   messagingPromise = (async () => {
     const supported = await isSupported().catch(() => false);
+    console.log(`[FCM] Firebase messaging supported: ${supported}`);
     if (!supported) {
       console.warn("[FCM] Firebase Messaging is not supported in this browser environment.");
       return null;
@@ -47,38 +48,82 @@ export async function getFirebaseMessaging(): Promise<Messaging | null> {
   return messagingPromise;
 }
 
+/**
+ * Builds the service worker registration URL with public client config query params
+ * so the background service worker can initialize Firebase without hardcoded keys.
+ */
+export function getServiceWorkerUrl(): string {
+  const queryParams = new URLSearchParams({
+    apiKey: firebaseConfig.apiKey || "",
+    authDomain: firebaseConfig.authDomain || "",
+    projectId: firebaseConfig.projectId || "",
+    storageBucket: firebaseConfig.storageBucket || "",
+    messagingSenderId: firebaseConfig.messagingSenderId || "",
+    appId: firebaseConfig.appId || "",
+  });
+  return `/firebase-messaging-sw.js?${queryParams.toString()}`;
+}
+
+/**
+ * Single, unified service worker registration helper.
+ * Ensures the exact same registration URL and options are used across the app.
+ */
+export async function registerBloodBridgeServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    console.warn("[SW] Service worker registered: false (unsupported in this environment)");
+    return null;
+  }
+
+  try {
+    const swUrl = getServiceWorkerUrl();
+    const registration = await navigator.serviceWorker.register(swUrl, { scope: "/" });
+    await navigator.serviceWorker.ready;
+    console.log("[SW] Service worker registered: true");
+    return registration;
+  } catch (err) {
+    console.warn(
+      "[SW] Service worker registered: false",
+      err instanceof Error ? err.message : "Registration failed"
+    );
+    return null;
+  }
+}
+
 export async function requestNotificationPermissionAndToken(): Promise<string | null> {
   if (typeof window === "undefined" || !("Notification" in window)) {
     console.warn("[FCM] Browser does not support HTML5 notifications.");
     return null;
   }
 
-  // If already explicitly denied, do not prompt repeatedly
+  // Check existing permission state
   if (Notification.permission === "denied") {
-    console.warn("[FCM] Notification permission was previously denied by user.");
+    console.warn("[FCM] Notification permission: denied");
     return null;
   }
 
   const permission = await Notification.requestPermission();
+  console.log(`[FCM] Notification permission: ${permission}`);
   if (permission !== "granted") {
-    console.log("[FCM] User dismissed or denied notification permission.");
     return null;
   }
 
   const messaging = await getFirebaseMessaging();
-  if (!messaging) return null;
+  if (!messaging) {
+    console.warn("[FCM] Firebase messaging configuration is incomplete.");
+    return null;
+  }
 
   const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+  if (!vapidKey) {
+    console.warn("[FCM] Firebase VAPID key is missing.");
+    return null;
+  }
 
   try {
     let swRegistration: ServiceWorkerRegistration | undefined;
     if ("serviceWorker" in navigator) {
-      swRegistration =
-        (await navigator.serviceWorker.getRegistration("/")) ||
-        (await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
-          scope: "/",
-        }));
-      await navigator.serviceWorker.ready;
+      await registerBloodBridgeServiceWorker();
+      swRegistration = await navigator.serviceWorker.ready;
     }
 
     const token = await getToken(messaging, {
@@ -87,11 +132,16 @@ export async function requestNotificationPermissionAndToken(): Promise<string | 
     });
 
     if (token) {
-      console.log("[FCM] Successfully acquired device token:", token.substring(0, 10) + "...");
+      console.log("[FCM] FCM token registration: successful");
       return token;
+    } else {
+      console.warn("[FCM] FCM token registration: failed");
     }
   } catch (error) {
-    console.error("[FCM] Error acquiring FCM device token:", error);
+    console.error(
+      "[FCM] FCM token registration: failed",
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 
   return null;
@@ -105,7 +155,6 @@ export function onForegroundMessage(
   getFirebaseMessaging().then((messaging) => {
     if (messaging) {
       unsubscribe = onMessage(messaging, (payload) => {
-        console.log("[FCM] Foreground push received:", payload);
         callback(payload);
       });
     }
