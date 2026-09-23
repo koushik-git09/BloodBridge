@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -7,6 +8,8 @@ from app.database.mongodb import db
 from app.services.donor_matching_service import (
     find_matching_donors,
 )
+
+logger = logging.getLogger("bloodbridge.reservations")
 
 
 # =========================================================
@@ -241,15 +244,24 @@ async def update_main_blood_request(
     )
 
     # -----------------------------------------------------
+    # Check pending reservations for this request
+    # -----------------------------------------------------
+    pending_count = await db.blood_bank_reservations.count_documents(
+        {
+            "request_id": request_id,
+            "status": "PENDING",
+        }
+    )
+
+    # -----------------------------------------------------
     # Determine status
     # -----------------------------------------------------
 
     if remaining_units == 0:
-
         new_status = "FULFILLED"
-
+    elif pending_count > 0:
+        new_status = "CHECKING_BLOOD_BANK"
     else:
-
         new_status = "DONOR_MATCHING"
 
     # -----------------------------------------------------
@@ -288,13 +300,14 @@ async def update_main_blood_request(
     )
 
     # -----------------------------------------------------
-    # If blood bank could not fully fulfill the request,
-    # automatically start donor matching.
+    # If all blood banks responded and units remain,
+    # start donor matching now.
     # -----------------------------------------------------
 
     if (
         updated_request
         and remaining_units > 0
+        and pending_count == 0
     ):
         await run_donor_matching_for_request(
             updated_request
@@ -507,6 +520,48 @@ async def respond_to_reservation(
 
         units_confirmed=units_confirmed,
     )
+
+    # -----------------------------------------------------
+    # Notify hospital of blood bank's response
+    # -----------------------------------------------------
+    try:
+        from app.services.notification_service import send_notification_to_user
+        bank_name = blood_bank.get("name", "Blood Bank")
+        bb_address = (blood_bank.get("location") or {}).get("address", "")
+        addr_txt = f" Address: {bb_address}." if bb_address else ""
+
+        if action == "CONFIRM":
+            h_title = "✅ Blood Units Confirmed"
+            h_msg = f"{bank_name} confirmed {units_confirmed} unit(s) of {reservation['blood_group']}.{addr_txt}"
+        elif action == "PARTIAL":
+            h_title = "⚠️ Partial Units Confirmed"
+            h_msg = f"{bank_name} confirmed {units_confirmed} unit(s) of {reservation['blood_group']}. Searching nearby donors for remaining units.{addr_txt}"
+        else:
+            h_title = "❌ Blood Bank Unavailable"
+            h_msg = f"{bank_name} could not fulfill {reservation['blood_group']} units. Initiating donor matching."
+
+        await send_notification_to_user(
+            user_id=reservation["hospital_id"],
+            title=h_title,
+            message=h_msg,
+            notification_type="BLOOD_BANK_RESPONSE",
+            data={
+                "type": "BLOOD_BANK_RESPONSE",
+                "request_id": reservation["request_id"],
+                "reservation_id": reservation_id,
+                "blood_bank_id": blood_bank_id,
+                "blood_bank_name": bank_name,
+                "blood_bank_address": bb_address,
+                "action": action,
+                "units_confirmed": units_confirmed,
+                "blood_group": reservation["blood_group"],
+                "notification_type": "BLOOD_BANK_RESPONSE",
+            },
+            urgency="HIGH" if action == "CONFIRM" else "NORMAL",
+            dedup_key=f"bb_res_ack:{reservation_id}:{action}",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to notify hospital of blood bank response: {e}")
 
     # -----------------------------------------------------
     # Get updated reservation

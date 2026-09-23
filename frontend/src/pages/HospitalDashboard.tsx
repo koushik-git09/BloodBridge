@@ -21,6 +21,10 @@ import HospitalRequestDetails from "../components/hospital/HospitalRequestDetail
 import NotificationCenter from "../components/common/NotificationCenter";
 import CreateRequestFlow from "../components/CreateRequestFlow";
 import { formatTime, formatDate } from "../utils/date";
+import {
+  enableNotifications,
+  getBrowserNotificationPermission,
+} from "../services/notificationService";
 
 
 function mapApiRequestToBloodRequest(
@@ -245,6 +249,13 @@ export default function HospitalDashboard() {
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
+
+  useEffect(() => {
+    const perm = getBrowserNotificationPermission();
+    if (perm === "granted") {
+      enableNotifications().catch(() => {});
+    }
+  }, []);
 
   const handleCreateSubmit = async (data: {
     patientReference: string;

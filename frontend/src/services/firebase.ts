@@ -73,9 +73,11 @@ export async function requestNotificationPermissionAndToken(): Promise<string | 
   try {
     let swRegistration: ServiceWorkerRegistration | undefined;
     if ("serviceWorker" in navigator) {
-      swRegistration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
-        scope: "/",
-      });
+      swRegistration =
+        (await navigator.serviceWorker.getRegistration("/")) ||
+        (await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
+          scope: "/",
+        }));
       await navigator.serviceWorker.ready;
     }
 
