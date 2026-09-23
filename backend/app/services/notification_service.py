@@ -1,10 +1,11 @@
+import json
 import logging
 from datetime import datetime, timezone
 from bson import ObjectId
 import firebase_admin
 from firebase_admin import credentials, messaging
 
-from app.core.config import FIREBASE_CREDENTIALS_FULL_PATH
+from app.core.config import FIREBASE_CREDENTIALS_FULL_PATH, FIREBASE_CREDENTIALS_JSON
 from app.database.mongodb import db
 
 logger = logging.getLogger("bloodbridge.notifications")
@@ -28,6 +29,19 @@ def init_firebase_admin() -> bool:
         return True
 
     try:
+        # 1. Try initializing from FIREBASE_CREDENTIALS_JSON environment variable (ideal for cloud platforms)
+        if FIREBASE_CREDENTIALS_JSON:
+            try:
+                cred_dict = json.loads(FIREBASE_CREDENTIALS_JSON)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                _firebase_initialized = True
+                logger.info("[FCM] Firebase Admin SDK initialized successfully from environment variable.")
+                return True
+            except Exception as e:
+                logger.error(f"[FCM] Failed to initialize Firebase from FIREBASE_CREDENTIALS_JSON: {e}")
+
+        # 2. Try initializing from local file path
         cred_path = FIREBASE_CREDENTIALS_FULL_PATH
         if not cred_path.exists():
             logger.warning(
@@ -38,11 +52,12 @@ def init_firebase_admin() -> bool:
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)
         _firebase_initialized = True
-        logger.info("[FCM] Firebase Admin SDK initialized successfully.")
+        logger.info("[FCM] Firebase Admin SDK initialized successfully from file.")
         return True
     except Exception as e:
         logger.error(f"[FCM] Failed to initialize Firebase Admin SDK: {e}")
         return False
+
 
 
 # Attempt startup initialization
