@@ -67,15 +67,21 @@ export default function DonorRequestsList({
                     <span>Distance: <span className="font-semibold text-bb-text">{request.distance.toFixed(1)} km</span></span>
                     <span>•</span>
                     <span>Match: <span className="font-semibold text-bb-teal">{request.match_score}%</span></span>
-                    {request.hospital_phone && isAccepted && (
-                      <>
-                        <span>•</span>
-                        <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          📞 {request.hospital_phone}
-                        </span>
-                      </>
-                    )}
                   </div>
+
+                  {request.hospital_phone && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                      <span className="text-slate-700 font-medium">
+                        Hospital Contact: <span className="text-bb-text font-bold">{request.hospital_phone}</span>
+                      </span>
+                      <a
+                        href={`tel:${request.hospital_phone}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition active:scale-95"
+                      >
+                        📞 Contact Hospital
+                      </a>
+                    </div>
+                  )}
                 </div>
 
               </div>

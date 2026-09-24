@@ -58,7 +58,7 @@ async def serialize_request(
                 request["_id"]
             ),
             "status": {
-                "$in": ["PENDING", "ACCEPTED"]
+                "$in": ["PENDING", "ACCEPTED", "DONATED"]
             },
         }
     ).sort(
@@ -138,7 +138,7 @@ async def serialize_request(
         legacy_cursor = db.donor_matches.find(
             {
                 "request_id": str(request["_id"]),
-                "status": {"$in": ["PENDING", "ACCEPTED"]},
+                "status": {"$in": ["PENDING", "ACCEPTED", "DONATED"]},
             }
         ).sort("match_score", -1).limit(10)
 
@@ -186,7 +186,7 @@ async def serialize_request(
         bb_name = resv.get("blood_bank_name")
         bb_address = resv.get("blood_bank_address")
         bb_phone = resv.get("blood_bank_phone")
-        if not bb_name or not bb_address:
+        if not bb_phone or not bb_name or not bb_address:
             try:
                 bb_user = await db.users.find_one({"_id": ObjectId(resv["blood_bank_id"])})
                 if bb_user:
