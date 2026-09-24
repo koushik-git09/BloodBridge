@@ -23,14 +23,19 @@ async def serialize_reservation(
     hospital_address = reservation.get("hospital_address")
     blood_bank_name = reservation.get("blood_bank_name")
     blood_bank_address = reservation.get("blood_bank_address")
+    blood_bank_phone = reservation.get("blood_bank_phone")
     urgency = reservation.get("urgency")
+    patient_reference = reservation.get("patient_reference")
+    hospital_phone = reservation.get("hospital_phone")
 
-    if not hospital_name or not urgency or not hospital_address:
+    if not patient_reference or not urgency or not hospital_name or not hospital_address:
         try:
             req = await db.blood_requests.find_one(
                 {"_id": ObjectId(reservation["request_id"])}
             )
             if req:
+                if not patient_reference:
+                    patient_reference = req.get("patient_reference")
                 if not hospital_name:
                     hospital_name = req.get("hospital_name")
                 if not urgency:
@@ -40,27 +45,31 @@ async def serialize_reservation(
         except Exception:
             pass
 
-        if not hospital_name or not hospital_address:
-            try:
-                hospital = await db.users.find_one(
-                    {"_id": ObjectId(reservation["hospital_id"])}
-                )
-                if hospital:
-                    if not hospital_name:
-                        hospital_name = hospital.get(
-                            "hospitalName", hospital.get("name")
-                        )
-                    if not hospital_address:
-                        hospital_address = (hospital.get("location") or {}).get("address", "")
-            except Exception:
-                pass
+    if not hospital_phone or not hospital_name or not hospital_address:
+        try:
+            hospital = await db.users.find_one(
+                {"_id": ObjectId(reservation["hospital_id"])}
+            )
+            if hospital:
+                if not hospital_phone:
+                    hospital_phone = hospital.get("phone")
+                if not hospital_name:
+                    hospital_name = hospital.get(
+                        "hospitalName", hospital.get("name")
+                    )
+                if not hospital_address:
+                    hospital_address = (hospital.get("location") or {}).get("address", "")
+        except Exception:
+            pass
 
-    if not blood_bank_name or not blood_bank_address:
+    if not blood_bank_phone or not blood_bank_name or not blood_bank_address:
         try:
             blood_bank = await db.users.find_one(
                 {"_id": ObjectId(reservation["blood_bank_id"])}
             )
             if blood_bank:
+                if not blood_bank_phone:
+                    blood_bank_phone = blood_bank.get("phone")
                 if not blood_bank_name:
                     blood_bank_name = blood_bank.get("name", "Blood Bank")
                 if not blood_bank_address:
@@ -75,8 +84,11 @@ async def serialize_reservation(
         "hospital_id": reservation["hospital_id"],
         "hospital_name": hospital_name,
         "hospital_address": hospital_address,
+        "hospital_phone": hospital_phone,
+        "patient_reference": patient_reference,
         "blood_bank_name": blood_bank_name,
         "blood_bank_address": blood_bank_address,
+        "blood_bank_phone": blood_bank_phone,
         "urgency": urgency,
         "blood_group": reservation["blood_group"],
         "units_requested": reservation["units_requested"],

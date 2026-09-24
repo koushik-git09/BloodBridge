@@ -15,8 +15,11 @@ class BloodBankReservationResponse(BaseModel):
 
     hospital_name: str | None = None
     hospital_address: str | None = None
+    hospital_phone: str | None = None
+    patient_reference: str | None = None
     blood_bank_name: str | None = None
     blood_bank_address: str | None = None
+    blood_bank_phone: str | None = None
 
     urgency: str | None = None
 

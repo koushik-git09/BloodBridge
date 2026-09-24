@@ -211,13 +211,21 @@ export default function HospitalRequestDetails({
                               <span>Confirmed: <strong className="text-emerald-700 font-sans">{bank.unitsConfirmed} units</strong></span>
                             </>
                           )}
-                          {bank.bloodBankPhone && (
-                            <>
-                              <span>•</span>
-                              <span className="text-slate-800">📞 {bank.bloodBankPhone}</span>
-                            </>
-                          )}
                         </div>
+
+                        {bank.bloodBankPhone && (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                            <span className="text-slate-700 font-medium">
+                              Mobile: <span className="text-bb-text font-bold">{bank.bloodBankPhone}</span>
+                            </span>
+                            <a
+                              href={`tel:${bank.bloodBankPhone}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition active:scale-95"
+                            >
+                              📞 Contact Blood Bank
+                            </a>
+                          </div>
+                        )}
                       </div>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${

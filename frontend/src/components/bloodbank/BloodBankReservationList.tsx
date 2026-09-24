@@ -71,6 +71,23 @@ export default function BloodBankReservationList({
               <p>
                 <strong>Hospital:</strong> {selectedRes.hospital_name || "Hospital Facility"}
               </p>
+              {selectedRes.patient_reference && (
+                <p>
+                  <strong>Patient Reference:</strong>{" "}
+                  <span className="font-mono text-bb-dim font-bold">{selectedRes.patient_reference}</span>
+                </p>
+              )}
+              {selectedRes.hospital_phone && (
+                <p className="flex items-center gap-2">
+                  <strong>Hospital Contact:</strong>{" "}
+                  <a
+                    href={`tel:${selectedRes.hospital_phone}`}
+                    className="font-bold text-emerald-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    📞 {selectedRes.hospital_phone}
+                  </a>
+                </p>
+              )}
               {selectedRes.hospital_address && (
                 <p className="flex items-start gap-1 text-slate-700">
                   <strong className="text-bb-crimson shrink-0">📍 Location:</strong>
@@ -210,6 +227,12 @@ export default function BloodBankReservationList({
                         </p>
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-bb-muted">
+                        {res.patient_reference && (
+                          <>
+                            <span>Ref: <strong className="font-mono text-bb-dim">{res.patient_reference}</strong></span>
+                            <span>•</span>
+                          </>
+                        )}
                         <span>Distance: <strong className="text-bb-text">{res.distance.toFixed(1)} km</strong></span>
 
                         <span>•</span>
@@ -228,6 +251,20 @@ export default function BloodBankReservationList({
                           </>
                         )}
                       </div>
+
+                      {res.hospital_phone && (
+                        <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">
+                          <span className="text-slate-700 font-medium">
+                            Hospital Contact: <span className="text-bb-text font-bold">{res.hospital_phone}</span>
+                          </span>
+                          <a
+                            href={`tel:${res.hospital_phone}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 text-xs font-semibold transition active:scale-95"
+                          >
+                            📞 Contact Hospital
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
 

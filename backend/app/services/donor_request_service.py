@@ -119,6 +119,42 @@ async def create_donor_requests_for_blood_request(
 
 
 
+async def enrich_donor_request(request: dict) -> dict:
+    """
+    Enrich a donor request with hospital and blood request details,
+    including the real hospital phone number for the matched donor.
+    """
+    req_id = request.get("request_id")
+    if req_id:
+        try:
+            blood_request = await db.blood_requests.find_one(
+                {"_id": ObjectId(req_id)}
+            )
+            if blood_request:
+                request["hospital_name"] = blood_request.get("hospital_name")
+                request["hospital_address"] = blood_request.get("hospital_address") or request.get("hospital_address")
+                request["urgency"] = blood_request.get("urgency")
+                request["units_required"] = blood_request.get("units_required")
+                request["patient_reference"] = blood_request.get("patient_reference")
+        except Exception:
+            pass
+
+    hospital_id = request.get("hospital_id")
+    if hospital_id:
+        try:
+            h_user = await db.users.find_one({"_id": ObjectId(hospital_id)})
+            if h_user:
+                request["hospital_phone"] = h_user.get("phone")
+                if not request.get("hospital_address"):
+                    request["hospital_address"] = (h_user.get("location") or {}).get("address", "")
+                if not request.get("hospital_name"):
+                    request["hospital_name"] = h_user.get("hospitalName", h_user.get("name"))
+        except Exception:
+            pass
+
+    return request
+
+
 async def get_donor_requests_for_donor(
     donor_id: str,
 ):
@@ -142,49 +178,10 @@ async def get_donor_requests_for_donor(
         request["id"] = str(request["_id"])
         del request["_id"]
         request["donated_at"] = request.get(
-    "donated_at"
-)
+            "donated_at"
+        )
 
-        # Get blood request information
-        try:
-            blood_request = await db.blood_requests.find_one(
-                {
-                    "_id": ObjectId(
-                        request["request_id"]
-                    )
-                }
-            )
-        except Exception:
-            blood_request = None
-
-        if blood_request:
-            request["hospital_name"] = blood_request.get(
-                "hospital_name"
-            )
-            request["hospital_address"] = blood_request.get(
-                "hospital_address"
-            ) or request.get("hospital_address")
-            request["urgency"] = blood_request.get(
-                "urgency"
-            )
-            request["units_required"] = blood_request.get(
-                "units_required"
-            )
-            request["patient_reference"] = blood_request.get(
-                "patient_reference"
-            )
-
-        if not request.get("hospital_address"):
-            try:
-                h_user = await db.users.find_one({"_id": ObjectId(request["hospital_id"])})
-                if h_user:
-                    request["hospital_address"] = (h_user.get("location") or {}).get("address", "")
-                    request["hospital_phone"] = h_user.get("phone")
-                    if not request.get("hospital_name"):
-                        request["hospital_name"] = h_user.get("hospitalName", h_user.get("name"))
-            except Exception:
-                pass
-
+        request = await enrich_donor_request(request)
         requests.append(request)
 
     return requests
@@ -254,6 +251,7 @@ async def respond_to_donor_request(
     )
 
     del updated_request["_id"]
+    updated_request = await enrich_donor_request(updated_request)
 
     # Keep the hospital-facing donor match synchronized
     await db.donor_matches.update_one(

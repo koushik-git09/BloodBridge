@@ -197,6 +197,7 @@ async def find_matching_blood_banks(
             "available_units": available_units,
             "distance": distance,
             "location": location,
+            "phone": blood_bank.get("phone", ""),
         })
 
     # -----------------------------------------------------
@@ -273,6 +274,7 @@ async def create_blood_bank_reservations(
             "distance": bank["distance"],
             "blood_bank_name": bank.get("name", "Blood Bank"),
             "blood_bank_address": (bank.get("location") or {}).get("address", ""),
+            "blood_bank_phone": bank.get("phone", ""),
             "hospital_address": (hospital_location or {}).get("address", ""),
             "created_at": datetime.now(timezone.utc),
             "responded_at": None,
