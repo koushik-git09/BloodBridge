@@ -207,6 +207,12 @@ export default function BloodBankDashboard() {
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-bb-text">
               {user?.name || "Blood Bank Operations"}
             </h1>
+            {user?.location?.address && (
+              <p className="mt-1 text-xs text-slate-700 font-medium flex items-center gap-1">
+                <span className="text-bb-crimson">📍</span>
+                <span>{user.location.address}</span>
+              </p>
+            )}
             <p className="mt-1 text-xs text-bb-muted">
               Live inventory tracking and automated hospital reservation routing
             </p>

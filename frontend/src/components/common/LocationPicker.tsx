@@ -16,6 +16,7 @@ export default function LocationPicker({
     latitude,
     longitude,
     address: geoAddress,
+    addressUnavailable,
     loading,
     error,
     success,
@@ -36,7 +37,7 @@ export default function LocationPicker({
   // Report changes to parent whenever lat, lng, or manualAddress updates
   useEffect(() => {
     if (latitude !== null && longitude !== null) {
-      const activeAddress = manualAddress.trim() || geoAddress || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      const activeAddress = manualAddress.trim() || geoAddress || "";
       const key = `${latitude},${longitude},${activeAddress}`;
       if (lastReportedRef.current !== key) {
         lastReportedRef.current = key;
@@ -76,14 +77,14 @@ export default function LocationPicker({
           </span>
         </div>
         <p className="mt-0.5 text-xs text-bb-muted">
-          Your GPS coordinates ensure emergency distance calculations work accurately, while your manual address helps donors and hospitals navigate directly to you.
+          Your location coordinates ensure emergency distance calculations work accurately, while your verified address helps donors and hospitals navigate directly to you.
         </p>
       </div>
 
-      {/* 1. GPS Coordinates Detection */}
+      {/* 1. Location Detection */}
       <div className="space-y-2">
         <label className="block text-xs font-bold uppercase tracking-wider text-bb-muted">
-          Step 1: Detect GPS Coordinates
+          Step 1: Detect Location
         </label>
 
         {!success && !loading && (
@@ -96,7 +97,7 @@ export default function LocationPicker({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            Use My Current Location (GPS)
+            Use My Current Location
           </button>
         )}
 
@@ -106,27 +107,38 @@ export default function LocationPicker({
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Acquiring high-accuracy GPS coordinates...</span>
+            <span>Detecting location & resolving address...</span>
           </div>
         )}
 
         {success && latitude !== null && longitude !== null && (
-          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
-            <div className="flex items-center gap-2">
-              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-black">
+          <div className="flex items-start justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+            <div className="flex items-start gap-2.5">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-black mt-0.5">
                 ✓
               </span>
-              <div>
-                <p className="font-bold">GPS Location Verified</p>
-                <p className="font-mono text-[11px] text-emerald-700">
-                  Lat: {latitude.toFixed(5)}, Lng: {longitude.toFixed(5)}
-                </p>
+              <div className="space-y-1">
+                <p className="font-bold text-emerald-950">Location Detected</p>
+                {geoAddress ? (
+                  <p className="text-xs text-emerald-900 font-medium flex items-start gap-1">
+                    <span className="text-bb-crimson shrink-0">📍</span>
+                    <span className="leading-snug">{geoAddress}</span>
+                  </p>
+                ) : (
+                  <div className="rounded-lg bg-amber-100/70 border border-amber-300/60 p-2 text-amber-900 space-y-0.5">
+                    <p className="font-bold">Address unavailable</p>
+                    <p className="text-[11px] text-amber-800">
+                      Please try detecting your location again or type your address below.
+                    </p>
+                  </div>
+                )}
+                <p className="text-[11px] text-emerald-700">Location enabled successfully.</p>
               </div>
             </div>
             <button
               type="button"
               onClick={requestLocation}
-              className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
+              className="text-xs font-bold text-emerald-800 underline hover:text-emerald-950 shrink-0 ml-2"
             >
               Re-detect
             </button>
@@ -144,7 +156,7 @@ export default function LocationPicker({
               onClick={requestLocation}
               className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition"
             >
-              Retry GPS
+              Retry Location
             </button>
           </div>
         )}
