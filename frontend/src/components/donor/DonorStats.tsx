@@ -65,8 +65,19 @@ export default function DonorStats({
             <span className="text-sm font-semibold text-bb-muted">Not specified</span>
           )}
         </div>
-        <p className="mt-2 text-xs font-medium text-bb-dim">
-          Status: <span className="font-semibold text-bb-teal">{availability}</span>
+        <p className="mt-2 text-xs font-medium text-bb-dim flex items-center gap-1.5">
+          <span>Status:</span>
+          <span
+            className={`font-semibold ${
+              availability === "AVAILABLE"
+                ? "text-emerald-600"
+                : availability === "BUSY"
+                  ? "text-amber-600"
+                  : "text-rose-600"
+            }`}
+          >
+            {availability === "AVAILABLE" ? "🟢 Available" : availability === "BUSY" ? "🟡 Busy" : "🔴 Unavailable"}
+          </span>
         </p>
       </div>
 

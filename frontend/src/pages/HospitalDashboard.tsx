@@ -379,8 +379,13 @@ export default function HospitalDashboard() {
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-bb-text">
               {String(user?.hospitalName || user?.name || "Hospital Command Center")}
             </h1>
+            {user?.location?.address && (
+              <p className="mt-1 text-xs text-slate-700 font-medium flex items-center gap-1">
+                <span className="text-bb-crimson">📍</span>
+                <span>{user.location.address}</span>
+              </p>
+            )}
             <p className="mt-1 text-xs text-bb-muted">
-
               Real-time proximity blood matching with verified donors and nearby blood banks
             </p>
           </div>

@@ -22,6 +22,14 @@ export interface CurrentUser {
   name: string;
   email: string;
   role: Role;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
+  availability?: string;
+  hospitalName?: string;
+  bloodGroup?: string;
   [key: string]: unknown;
 }
 

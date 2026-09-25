@@ -57,9 +57,9 @@ export default function RegisterPage() {
 
     if (!role) return;
 
-    // Strictly require GPS location detection before account creation
+    // Strictly require location detection before account creation
     if (location.latitude === null || location.longitude === null) {
-      setError("Please click 'Use My Current Location (GPS)' to acquire your coordinates for distance matching.");
+      setError("Please click 'Use My Current Location' to acquire your location for distance matching.");
       return;
     }
 
