@@ -235,10 +235,12 @@ export default function HospitalRequestDetails({
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : bank.status === "PENDING"
                                 ? "bg-amber-50 text-amber-700 border-amber-200"
-                                : "bg-red-50 text-red-700 border-red-200"
+                                : bank.status === "FULFILLED_BY_OTHER"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : "bg-red-50 text-red-700 border-red-200"
                         }`}
                       >
-                        {bank.status}
+                        {bank.status === "FULFILLED_BY_OTHER" ? "FULFILLED BY OTHER" : bank.status}
                       </span>
                     </div>
                   </div>

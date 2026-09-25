@@ -25,7 +25,7 @@ export interface BloodBankReservationResponse {
   blood_group: BloodGroup;
   units_requested: number;
   units_confirmed: number;
-  status: "PENDING" | "CONFIRMED" | "PARTIAL" | "REJECTED";
+  status: "PENDING" | "CONFIRMED" | "PARTIAL" | "REJECTED" | "FULFILLED_BY_OTHER";
   distance: number;
   created_at: string;
   responded_at?: string | null;

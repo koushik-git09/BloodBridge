@@ -33,7 +33,8 @@ class BloodBankReservationResponse(BaseModel):
         "PENDING",
         "CONFIRMED",
         "PARTIAL",
-        "REJECTED"
+        "REJECTED",
+        "FULFILLED_BY_OTHER",
     ]
 
     distance: float

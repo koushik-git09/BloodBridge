@@ -271,6 +271,19 @@ async def update_main_blood_request(
 
     if remaining_units == 0:
         new_status = "FULFILLED"
+        # Auto-update any remaining PENDING blood bank reservations for this request to FULFILLED_BY_OTHER
+        await db.blood_bank_reservations.update_many(
+            {
+                "request_id": request_id,
+                "status": "PENDING",
+            },
+            {
+                "$set": {
+                    "status": "FULFILLED_BY_OTHER",
+                    "responded_at": datetime.now(timezone.utc),
+                }
+            },
+        )
     elif pending_count > 0:
         new_status = "CHECKING_BLOOD_BANK"
     else:
@@ -438,6 +451,35 @@ async def respond_to_reservation(
     if not blood_bank:
         return None, "NOT_FOUND"
 
+    # -----------------------------------------------------
+    # Check if main blood request is already fulfilled
+    # -----------------------------------------------------
+    blood_request = await db.blood_requests.find_one(
+        {"_id": ObjectId(reservation["request_id"])}
+    )
+
+    if not blood_request:
+        return None, "NOT_FOUND"
+
+    currently_needed = max(
+        int(blood_request.get("units_required", 0))
+        - int(blood_request.get("blood_bank_units", 0))
+        - int(blood_request.get("donor_units", 0)),
+        0,
+    )
+
+    if action in ("CONFIRM", "PARTIAL") and currently_needed <= 0:
+        await db.blood_bank_reservations.update_one(
+            {"_id": ObjectId(reservation_id)},
+            {
+                "$set": {
+                    "status": "FULFILLED_BY_OTHER",
+                    "responded_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+        return None, "REQUEST_ALREADY_FULFILLED"
+
     inventory = blood_bank.get("inventory", {})
     available_stock = int(inventory.get(reservation["blood_group"], 0))
 
@@ -450,12 +492,15 @@ async def respond_to_reservation(
         if available_stock <= 0:
             return None, "NO_STOCK_AVAILABLE"
 
-        if units_requested > available_stock:
+        # Cap confirm units to what the request actually still needs
+        actual_units_to_confirm = min(units_confirmed, currently_needed)
+        if actual_units_to_confirm <= 0:
+            return None, "REQUEST_ALREADY_FULFILLED"
+
+        if actual_units_to_confirm > available_stock:
             return None, "INSUFFICIENT_STOCK"
 
-        if units_confirmed != units_requested:
-            return None, "INVALID_CONFIRM"
-
+        units_confirmed = actual_units_to_confirm
         new_status = "CONFIRMED"
 
     elif action == "PARTIAL":
@@ -463,15 +508,14 @@ async def respond_to_reservation(
         if available_stock <= 0:
             return None, "NO_STOCK_AVAILABLE"
 
-        if units_confirmed > available_stock:
+        actual_units_to_confirm = min(units_confirmed, currently_needed)
+        if actual_units_to_confirm <= 0:
+            return None, "REQUEST_ALREADY_FULFILLED"
+
+        if actual_units_to_confirm > available_stock:
             return None, "INSUFFICIENT_STOCK"
 
-        if (
-            units_confirmed <= 0
-            or units_confirmed >= units_requested
-        ):
-            return None, "INVALID_PARTIAL"
-
+        units_confirmed = actual_units_to_confirm
         new_status = "PARTIAL"
 
     elif action == "REJECT":

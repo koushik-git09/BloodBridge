@@ -97,6 +97,12 @@ async def respond_reservation(
             detail="Cannot confirm reservation: Requested units exceed your available inventory stock.",
         )
 
+    if error == "REQUEST_ALREADY_FULFILLED":
+        raise HTTPException(
+            status_code=400,
+            detail="This request has already been fulfilled by another blood bank or facility.",
+        )
+
     if error == "INVALID_ACTION":
         raise HTTPException(
             status_code=400,
