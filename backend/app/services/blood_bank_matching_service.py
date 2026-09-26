@@ -147,7 +147,11 @@ async def find_matching_blood_banks(
 
     cursor = db.users.find({
         "role": "BLOOD_BANK",
-        "status": "ACTIVE",
+        "$or": [
+            {"status": "ACTIVE"},
+            {"status": "active"},
+            {"status": {"$exists": False}},
+        ],
     })
 
     async for blood_bank in cursor:
@@ -201,7 +205,7 @@ async def find_matching_blood_banks(
         })
 
     # -----------------------------------------------------
-    # Rank nearest first
+    # Rank nearest first, then by available inventory
     # -----------------------------------------------------
 
     matching_banks.sort(
@@ -226,8 +230,8 @@ async def create_blood_bank_reservations(
     hospital_location: dict,
 ):
     """
-    Find suitable blood banks and create reservations
-    until the requested units are covered.
+    Find all suitable registered blood banks with inventory
+    and create reservations for each one so they can respond.
     """
 
     matching_banks = await find_matching_blood_banks(
@@ -239,14 +243,9 @@ async def create_blood_bank_reservations(
     if not matching_banks:
         return []
 
-    remaining_units = units_required
     created_reservations = []
 
     for bank in matching_banks:
-
-        if remaining_units <= 0:
-            break
-
         existing_reservation = await db.blood_bank_reservations.find_one({
             "request_id": request_id,
             "blood_bank_id": bank["blood_bank_id"],
@@ -255,8 +254,9 @@ async def create_blood_bank_reservations(
         if existing_reservation:
             continue
 
+        # Request units required up to this blood bank's available inventory
         units_to_request = min(
-            remaining_units,
+            units_required,
             bank["available_units"],
         )
 
@@ -280,7 +280,6 @@ async def create_blood_bank_reservations(
             "responded_at": None,
         }
 
-
         result = await db.blood_bank_reservations.insert_one(
             reservation_document
         )
@@ -290,7 +289,5 @@ async def create_blood_bank_reservations(
         created_reservations.append(
             reservation_document
         )
-
-        remaining_units -= units_to_request
 
     return created_reservations

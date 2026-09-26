@@ -79,7 +79,7 @@ class BloodRequestResponse(BaseModel):
     donor_units: int
     remaining_units: int
     notes: str | None = None
-    created_at: datetime
+    created_at: datetime | None = None
     updated_at: datetime | None = None
     fulfilled_at: datetime | None = None
     donors: list[DonorMatchResponse] = Field(default_factory=list)

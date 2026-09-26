@@ -18,6 +18,9 @@ router = APIRouter(
 @router.get(
     "/request/{request_id}",
 )
+@router.post(
+    "/request/{request_id}",
+)
 async def get_matching_donors(
     request_id: str,
     current_user=Depends(

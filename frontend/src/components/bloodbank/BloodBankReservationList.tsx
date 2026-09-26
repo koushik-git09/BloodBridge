@@ -203,6 +203,7 @@ export default function BloodBankReservationList({
             const isConfirmed = res.status === "CONFIRMED";
             const isPartial = res.status === "PARTIAL";
             const isRejected = res.status === "REJECTED";
+            const isFulfilledByOther = res.status === "FULFILLED_BY_OTHER";
 
             const stock = inventory[res.blood_group] ?? 0;
             const hasStock = stock > 0;
@@ -280,13 +281,21 @@ export default function BloodBankReservationList({
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : isPartial
                               ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-red-50 text-red-700 border-red-200"
+                              : isFulfilledByOther
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-red-50 text-red-700 border-red-200"
                       }`}
                     >
-                      {res.status}
+                      {isFulfilledByOther ? "FULFILLED BY OTHER" : res.status}
                     </span>
                   </div>
                 </div>
+
+                {isFulfilledByOther && (
+                  <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/70 px-3.5 py-2 text-xs text-purple-800 flex items-center gap-1.5">
+                    <span>ℹ️ This request was fulfilled by another blood bank facility.</span>
+                  </div>
+                )}
 
                 {isPending && (
                   <>

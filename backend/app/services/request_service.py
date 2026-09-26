@@ -96,26 +96,27 @@ async def serialize_request(
                 "Donor",
             ),
 
-            "blood_group": match[
-                "blood_group"
-            ],
+            "blood_group": match.get(
+                "blood_group",
+                "",
+            ),
 
             "availability": donor.get(
                 "availability",
                 "AVAILABLE",
             ),
 
-            "distance": match[
-                "distance"
-            ],
+            "distance": float(
+                match.get("distance", 0.0)
+            ),
 
-            "match_score": match[
-                "match_score"
-            ],
+            "match_score": float(
+                match.get("match_score", 0.0)
+            ),
 
-            "trust_score": match[
-                "trust_score"
-            ],
+            "trust_score": float(
+                match.get("trust_score", 0.0)
+            ),
 
             "donation_count": donor.get(
                 "donationCount",
@@ -161,11 +162,11 @@ async def serialize_request(
                 "donor_id": match["donor_id"],
                 "donor_request_id": match.get("donor_request_id"),
                 "name": donor.get("name", "Donor"),
-                "blood_group": match["blood_group"],
+                "blood_group": match.get("blood_group", ""),
                 "availability": donor.get("availability", "AVAILABLE"),
-                "distance": match["distance"],
-                "match_score": match["match_score"],
-                "trust_score": match["trust_score"],
+                "distance": float(match.get("distance", 0.0)),
+                "match_score": float(match.get("match_score", 0.0)),
+                "trust_score": float(match.get("trust_score", 0.0)),
                 "donation_count": donor.get("donationCount", 0),
                 "last_donation": to_utc(donor.get("lastDonation")),
                 "status": match_status,
@@ -211,41 +212,49 @@ async def serialize_request(
 
     return {
         "id": str(
-            request["_id"]
+            request.get("_id", "")
         ),
 
         "hospital_id": str(
-            request["hospital_id"]
+            request.get("hospital_id", "")
         ),
 
         "hospital_name": request.get(
-            "hospital_name"
+            "hospital_name",
+            "Hospital",
         ),
 
         "hospital_address": request.get(
             "hospital_address",
             "",
+        ) or "",
+
+        "patient_reference": request.get(
+            "patient_reference",
+            "",
+        ) or "General",
+
+        "blood_group": request.get(
+            "blood_group",
+            "O+",
         ),
 
-        "patient_reference": request[
-            "patient_reference"
-        ],
+        "units_required": int(
+            request.get(
+                "units_required",
+                1,
+            ) or 1
+        ),
 
-        "blood_group": request[
-            "blood_group"
-        ],
+        "urgency": request.get(
+            "urgency",
+            "NORMAL",
+        ) or "NORMAL",
 
-        "units_required": request[
-            "units_required"
-        ],
-
-        "urgency": request[
-            "urgency"
-        ],
-
-        "status": request[
-            "status"
-        ],
+        "status": request.get(
+            "status",
+            "PENDING",
+        ) or "PENDING",
 
         "blood_bank_units": request.get(
             "blood_bank_units",
@@ -263,13 +272,17 @@ async def serialize_request(
             "notes"
         ),
 
-        "created_at": to_utc(request.get("created_at")),
+        "created_at": (
+            to_utc(request.get("created_at"))
+            or (to_utc(request["_id"].generation_time) if isinstance(request.get("_id"), ObjectId) else None)
+            or datetime.now(timezone.utc)
+        ),
 
-        "updated_at": to_utc(
-            request.get(
-                "updated_at",
-                request.get("created_at"),
-            )
+        "updated_at": (
+            to_utc(request.get("updated_at"))
+            or to_utc(request.get("created_at"))
+            or (to_utc(request["_id"].generation_time) if isinstance(request.get("_id"), ObjectId) else None)
+            or datetime.now(timezone.utc)
         ),
 
         "fulfilled_at": to_utc(
