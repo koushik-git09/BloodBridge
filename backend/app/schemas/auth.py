@@ -52,5 +52,15 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ResetPasswordResponse(BaseModel):
+    message: str
+    role: str | None = None
+
+
+class VerifyResetTokenResponse(BaseModel):
+    valid: bool
+    role: str | None = None
+
+
 class GenericMessageResponse(BaseModel):
     message: str

@@ -579,6 +579,7 @@ async def confirm_donation(
             "$set": {
                 "lastDonation": now,
                 "availability": "UNAVAILABLE",
+                "cooldownOverride": False,
             },
         },
     )

@@ -15,21 +15,30 @@ from app.core.config import (
 logger = logging.getLogger(__name__)
 
 
-def send_password_reset_email(to_email: str, reset_token: str) -> bool:
+def send_password_reset_email(to_email: str, reset_token: str, role: str = "DONOR") -> bool:
     """
-    Send password reset email to the user with a secure reset link.
+    Send password reset email to the user with a secure role-aware reset link.
     Returns True if sent successfully, False otherwise.
     Never throws an unhandled exception to prevent breaking caller or leaking account state.
     """
-    reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    role_upper = (role or "DONOR").upper()
+    role_slug = (
+        "hospital"
+        if role_upper == "HOSPITAL"
+        else "blood-bank"
+        if role_upper == "BLOOD_BANK"
+        else "donor"
+    )
+    reset_url = f"{FRONTEND_URL}/reset-password?token={reset_token}&role={role_slug}"
 
     subject = "BloodBridge Password Reset"
 
     text_body = (
         f"Hello,\n\n"
-        f"A password reset was requested for your BloodBridge account.\n\n"
+        f"We received a request to reset your BloodBridge password.\n\n"
         f"To reset your password, please click the link below (valid for 15 minutes):\n"
         f"{reset_url}\n\n"
+        f"This link will take you to the correct BloodBridge portal for your account.\n\n"
         f"If you did not request a password reset, you can safely ignore this email. "
         f"Your account remains secure.\n\n"
         f"Regards,\n"
@@ -60,10 +69,11 @@ def send_password_reset_email(to_email: str, reset_token: str) -> bool:
     </div>
     <div class="content">
       <p>Hello,</p>
-      <p>A password reset was requested for your BloodBridge account. Please click the button below to choose a new password.</p>
+      <p>We received a request to reset your BloodBridge password. Please click the button below to choose a new password.</p>
       <div class="button-container">
         <a href="{reset_url}" class="btn" target="_blank">Reset Password</a>
       </div>
+      <p>This link will take you to the correct BloodBridge portal for your account.</p>
       <p>This password reset link will expire in <strong>15 minutes</strong> and can only be used once.</p>
       <p class="link-alt">If the button does not work, copy and paste this URL into your browser:<br><a href="{reset_url}">{reset_url}</a></p>
       <p>If you did not request this reset, no action is needed. Your account is completely safe.</p>

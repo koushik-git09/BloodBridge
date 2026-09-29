@@ -12,6 +12,9 @@ import BloodBankDashboard from "./pages/BloodBankDashboard";
 import DonorDashboard from "./pages/DonorDashboard";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 
 export default function App() {
   return (
@@ -66,6 +69,28 @@ export default function App() {
         <Route
           path="/reset-password"
           element={<ResetPasswordPage />}
+        />
+
+
+        {/* ================= ADMIN ROUTES ================= */}
+
+        <Route
+          path="/admin/login"
+          element={<AdminLoginPage />}
+        />
+
+        <Route
+          path="/admin"
+          element={<Navigate to="/admin/dashboard" replace />}
+        />
+
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboardPage />
+            </AdminProtectedRoute>
+          }
         />
 
 

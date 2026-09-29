@@ -9,6 +9,7 @@ from app.routers.donor_matching import router as donor_matching_router
 from app.routers import donor_requests
 from app.routers import users
 from app.routers import donations
+from app.routers.admin import router as admin_router
 from app.routers.notifications import router as notifications_router
 from app.core.config import FRONTEND_URL, CORS_ORIGINS
 
@@ -49,6 +50,7 @@ app.add_middleware(
 
 
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(blood_request_router)
 app.include_router(blood_bank_router)
 app.include_router(

@@ -105,14 +105,19 @@ def calculate_distance_km(
 
 def is_donor_eligible(
     last_donation,
+    availability: str | None = None,
+    cooldown_override: bool = False,
 ) -> bool:
     """
     A donor is eligible when:
 
-    1. They have never donated, or
-    2. At least 90 days have passed since their
-       previous donation.
+    1. They have explicitly set their status to AVAILABLE in the portal (manual override / opt-in), or
+    2. They have never donated, or
+    3. At least 90 days have passed since their previous donation.
     """
+
+    if cooldown_override or availability == "AVAILABLE":
+        return True
 
     if not last_donation:
         return True
@@ -307,7 +312,9 @@ async def find_matching_donors(
         # -------------------------------------------------
 
         if not is_donor_eligible(
-            donor.get("lastDonation")
+            donor.get("lastDonation"),
+            availability=donor.get("availability"),
+            cooldown_override=donor.get("cooldownOverride", False),
         ):
             continue
 

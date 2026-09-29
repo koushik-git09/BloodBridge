@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     name: str
     email: EmailStr
     phone: str
-    role: Literal["HOSPITAL", "BLOOD_BANK", "DONOR"]
+    role: Literal["HOSPITAL", "BLOOD_BANK", "DONOR", "ADMIN"]
     location: Location
 
 
@@ -47,4 +47,5 @@ class BloodBankProfile(BaseModel):
 class HospitalProfile(BaseModel):
     hospital_name: str
 
-    verified: bool = True
+    verified: bool = False
+    status: Literal["PENDING", "APPROVED", "REJECTED"] = "PENDING"
