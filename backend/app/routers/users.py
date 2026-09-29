@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Literal
 from bson import ObjectId
 
+from datetime import datetime, timezone
+
 from app.database.mongodb import db
 from app.dependencies.auth import require_role, get_current_user
 
@@ -56,15 +58,23 @@ async def update_my_availability(
             detail="Invalid donor ID",
         )
 
+    now = datetime.now(timezone.utc)
+    update_fields: dict = {
+        "availability": data.availability,
+        "availabilityUpdatedAt": now,
+    }
+    if data.availability == "AVAILABLE":
+        update_fields["cooldownOverride"] = True
+    elif data.availability == "UNAVAILABLE":
+        update_fields["cooldownOverride"] = False
+
     result = await db.users.update_one(
         {
             "_id": donor_object_id,
             "role": "DONOR",
         },
         {
-            "$set": {
-                "availability": data.availability,
-            }
+            "$set": update_fields,
         },
     )
 
@@ -73,6 +83,26 @@ async def update_my_availability(
             status_code=404,
             detail="Donor not found",
         )
+
+    # If donor just became AVAILABLE, match them with any currently active blood requests in DONOR_MATCHING
+    if data.availability == "AVAILABLE":
+        try:
+            from app.services.donor_request_service import create_donor_requests_for_blood_request
+            active_requests_cursor = db.blood_requests.find({
+                "status": {"$in": ["DONOR_MATCHING", "PARTIAL_FULFILLMENT"]}
+            })
+            async for req in active_requests_cursor:
+                h_id = req.get("hospital_id")
+                h_user = await db.users.find_one({"_id": ObjectId(h_id)}) if h_id else None
+                h_loc = (h_user.get("location") if h_user else None) or req.get("location") or {}
+                await create_donor_requests_for_blood_request(
+                    request_id=str(req["_id"]),
+                    hospital_id=str(h_id) if h_id else "",
+                    blood_group=req.get("blood_group", ""),
+                    hospital_location=h_loc,
+                )
+        except Exception:
+            pass
 
     return {
         "message": "Availability updated successfully",

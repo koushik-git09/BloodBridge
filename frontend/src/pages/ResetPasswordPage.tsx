@@ -1,17 +1,53 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { resetPassword } from "../services/authService";
+import { resetPassword, verifyResetToken } from "../services/authService";
+import type { Role } from "../types";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
+  const roleParam = searchParams.get("role") || "";
+
+  const [accountRole, setAccountRole] = useState<Role>(() => {
+    if (roleParam === "hospital") return "HOSPITAL";
+    if (roleParam === "blood-bank") return "BLOOD_BANK";
+    return "DONOR";
+  });
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Authenticate token against backend to determine authoritative account role
+  useEffect(() => {
+    if (!token) return;
+    verifyResetToken(token)
+      .then((data) => {
+        if (data.valid && data.role) {
+          setAccountRole(data.role);
+        }
+      })
+      .catch(() => {
+        // Fallback silently if verification fails; handleSubmit will report detailed error
+      });
+  }, [token]);
+
+  const getLoginPath = (role: Role) => {
+    if (role === "HOSPITAL") return "/login/hospital";
+    if (role === "BLOOD_BANK") return "/login/blood-bank";
+    return "/login/donor";
+  };
+
+  const getLoginButtonText = (role: Role) => {
+    if (role === "HOSPITAL") return "Proceed to Hospital Login";
+    if (role === "BLOOD_BANK") return "Proceed to Blood Bank Login";
+    return "Proceed to Donor Login";
+  };
+
+  const loginPath = getLoginPath(accountRole);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -35,7 +71,10 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await resetPassword(token, newPassword);
+      const res = await resetPassword(token, newPassword);
+      if (res.role) {
+        setAccountRole(res.role);
+      }
       setSuccess(true);
     } catch (err) {
       setError(
@@ -54,7 +93,7 @@ export default function ResetPasswordPage() {
       <nav className="glass border-b border-bb-border px-4 sm:px-6 h-14 flex items-center shrink-0">
         <button
           type="button"
-          onClick={() => navigate("/login/donor")}
+          onClick={() => navigate(loginPath)}
           className="flex items-center gap-2 text-bb-muted hover:text-bb-text transition-colors"
         >
           <img
@@ -126,10 +165,10 @@ export default function ResetPasswordPage() {
                 <div className="pt-2 border-t border-bb-border">
                   <button
                     type="button"
-                    onClick={() => navigate("/login/donor")}
+                    onClick={() => navigate(loginPath)}
                     className="w-full rounded-xl bg-bb-crimson px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition active:scale-98"
                   >
-                    Proceed to Donor Login
+                    {getLoginButtonText(accountRole)}
                   </button>
                 </div>
               </div>
@@ -200,7 +239,7 @@ export default function ResetPasswordPage() {
                 <div className="text-center pt-2">
                   <button
                     type="button"
-                    onClick={() => navigate("/login/donor")}
+                    onClick={() => navigate(loginPath)}
                     className="text-xs font-semibold text-bb-muted hover:text-bb-text transition-colors"
                   >
                     Back to Sign In

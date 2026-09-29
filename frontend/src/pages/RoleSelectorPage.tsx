@@ -137,6 +137,16 @@ export default function RoleSelectorPage() {
             <span className="text-bb-crimson-bright">Bridge</span>
           </span>
         </button>
+
+        {/* Admin Portal Button */}
+        <button
+          type="button"
+          onClick={() => navigate("/admin/login")}
+          className="glass border border-bb-border text-xs font-semibold text-bb-muted hover:text-bb-crimson-bright hover:border-bb-crimson/30 rounded-xl px-3.5 py-1.5 transition-all flex items-center gap-1.5 active:scale-98 shadow-sm"
+        >
+          <span className="size-2 rounded-full bg-bb-crimson" />
+          Admin Portal
+        </button>
       </nav>
 
       {/* Main Content */}

@@ -6,6 +6,8 @@ from app.schemas.auth import (
     TokenResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    ResetPasswordResponse,
+    VerifyResetTokenResponse,
     GenericMessageResponse,
 )
 
@@ -14,6 +16,7 @@ from app.services.auth_service import (
     login_user,
     request_password_reset,
     reset_password_with_token,
+    verify_reset_token_validity,
 )
 
 from app.dependencies.auth import get_current_user
@@ -42,6 +45,12 @@ async def register(
             detail=error
         )
 
+    if user_data.role == "HOSPITAL":
+        return {
+            "message": "Hospital registration submitted successfully. Your account is pending admin approval.",
+            "user": user,
+        }
+
     return {
         "message": "User registered successfully",
         "user": user,
@@ -56,16 +65,16 @@ async def login(
     credentials: LoginRequest
 ):
 
-    token = await login_user(
+    token, error, status_code = await login_user(
         credentials.email,
         credentials.password
     )
 
-    if not token:
+    if error or not token:
 
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            status_code=status_code or status.HTTP_401_UNAUTHORIZED,
+            detail=error or "Invalid email or password"
         )
 
     return token
@@ -86,9 +95,26 @@ async def forgot_password(
     return {"message": message}
 
 
+@router.get(
+    "/verify-reset-token",
+    response_model=VerifyResetTokenResponse,
+)
+async def verify_reset_token(
+    token: str,
+):
+    """
+    Verify reset token validity and return the authoritative account role.
+    """
+    valid, role = await verify_reset_token_validity(token)
+    return {
+        "valid": valid,
+        "role": role,
+    }
+
+
 @router.post(
     "/reset-password",
-    response_model=GenericMessageResponse,
+    response_model=ResetPasswordResponse,
 )
 async def reset_password(
     data: ResetPasswordRequest,
@@ -96,7 +122,7 @@ async def reset_password(
     """
     Validate password reset token and update user's password.
     """
-    success, error = await reset_password_with_token(
+    success, error, role = await reset_password_with_token(
         token=data.token,
         new_password=data.new_password,
     )
@@ -107,7 +133,10 @@ async def reset_password(
             detail=error or "Password reset failed",
         )
 
-    return {"message": "Password has been reset successfully."}
+    return {
+        "message": "Password has been reset successfully.",
+        "role": role,
+    }
 
 
 @router.get("/me")

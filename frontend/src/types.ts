@@ -26,7 +26,29 @@ export type Page =
 export type Role =
   | 'HOSPITAL'
   | 'BLOOD_BANK'
-  | 'DONOR';
+  | 'DONOR'
+  | 'ADMIN';
+
+export interface HospitalRegistration {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  hospital_name: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  };
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  verified: boolean;
+  created_at?: string;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
+}
+
 export interface BloodBank {
   id: string;
   name: string;

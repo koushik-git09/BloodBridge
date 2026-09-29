@@ -93,7 +93,10 @@ export default function RegisterPage() {
         state: {
           registered: true,
           email: form.email.trim(),
-          message: "Account created successfully. Please log in.",
+          message:
+            role === "HOSPITAL"
+              ? "Hospital registration submitted successfully. Your account is pending admin approval."
+              : "Account created successfully. Please log in.",
         },
       });
     } catch (err) {

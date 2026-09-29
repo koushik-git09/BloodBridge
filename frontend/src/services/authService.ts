@@ -67,8 +67,14 @@ export function forgotPassword(email: string) {
   });
 }
 
+export function verifyResetToken(token: string) {
+  return apiRequest<{ valid: boolean; role?: Role }>(
+    `/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`
+  );
+}
+
 export function resetPassword(token: string, newPassword: string) {
-  return apiRequest<{ message: string }>('/api/auth/reset-password', {
+  return apiRequest<{ message: string; role?: Role }>('/api/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({ token, new_password: newPassword }),
   });
