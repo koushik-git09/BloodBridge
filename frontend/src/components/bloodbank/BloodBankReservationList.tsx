@@ -311,7 +311,7 @@ export default function BloodBankReservationList({
                         type="button"
                         disabled={responding}
                         onClick={() => handleOpenAction(res, "REJECT")}
-                        className="rounded-xl border border-bb-border px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                        className="flex-1 sm:flex-initial rounded-xl border border-bb-border px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition min-h-[38px] flex items-center justify-center active:scale-[0.98]"
                       >
                         Reject
                       </button>
@@ -320,7 +320,7 @@ export default function BloodBankReservationList({
                         disabled={responding || !hasStock}
                         onClick={() => handleOpenAction(res, "PARTIAL")}
                         title={!hasStock ? "No stock available in inventory" : undefined}
-                        className="rounded-xl border border-blue-300 bg-blue-50/60 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex-1 sm:flex-initial rounded-xl border border-blue-300 bg-blue-50/60 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[38px] flex items-center justify-center active:scale-[0.98]"
                       >
                         Partial Units
                       </button>
@@ -329,7 +329,7 @@ export default function BloodBankReservationList({
                         disabled={responding || !hasFullStock}
                         onClick={() => handleOpenAction(res, "CONFIRM")}
                         title={!hasFullStock ? (stock === 0 ? "No stock in inventory" : `Only ${stock} units in inventory`) : undefined}
-                        className="rounded-xl bg-bb-crimson px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full sm:w-auto rounded-xl bg-bb-crimson px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[38px] flex items-center justify-center active:scale-[0.98]"
                       >
                         Confirm All ({res.units_requested} units)
                       </button>

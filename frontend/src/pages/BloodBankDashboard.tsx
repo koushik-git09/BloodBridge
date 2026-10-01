@@ -20,6 +20,10 @@ import {
   enableNotifications,
   getBrowserNotificationPermission,
 } from "../services/notificationService";
+import {
+  subscribeBloodBridgeEvent,
+  emitBloodBridgeEvent,
+} from "../utils/events";
 
 
 const EMPTY_INVENTORY: Record<BloodGroup, number> = {
@@ -94,6 +98,44 @@ export default function BloodBankDashboard() {
 
   useEffect(() => {
     loadDashboard();
+
+    // Subscribe to real-time events targeting blood-bank or all
+    const unsubscribe = subscribeBloodBridgeEvent("bloodbridge:request-updated", (detail) => {
+      if (!detail.target || detail.target === "blood-bank" || detail.target === "all") {
+        loadDashboard();
+      }
+    });
+
+    const unsubscribeInv = subscribeBloodBridgeEvent("bloodbridge:inventory-updated", () => {
+      loadDashboard();
+    });
+
+    const unsubscribeRefresh = subscribeBloodBridgeEvent("bloodbridge:refresh-all", () => {
+      loadDashboard();
+    });
+
+    // Revalidate when browser tab becomes active again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadDashboard();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Active gentle polling while tab is open
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadDashboard();
+      }
+    }, 25000);
+
+    return () => {
+      unsubscribe();
+      unsubscribeInv();
+      unsubscribeRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [loadDashboard]);
 
   const handleSaveInventory = async (updated: Record<BloodGroup, number>) => {
@@ -104,6 +146,10 @@ export default function BloodBankDashboard() {
       setShowEditor(false);
       showToast("Inventory updated successfully.");
       await loadDashboard();
+
+      emitBloodBridgeEvent("bloodbridge:inventory-updated", {
+        source: "blood_bank_update",
+      });
     } catch (err) {
       console.error("Failed to update inventory:", err);
       showToast(err instanceof Error ? err.message : "Failed to update inventory.");
@@ -128,6 +174,12 @@ export default function BloodBankDashboard() {
             : "Reservation rejected."
       );
       await loadDashboard();
+
+      // Broadcast update so hospital dashboard syncs immediately
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "blood_bank_respond",
+      });
     } catch (err) {
       console.error("Failed to respond to reservation:", err);
       showToast(err instanceof Error ? err.message : "Failed to respond to reservation.");
@@ -162,37 +214,39 @@ export default function BloodBankDashboard() {
       />
 
       {/* Top Navbar */}
-      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-3 sm:px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <img
             src="/bloodbridge-logo.png"
             alt="BloodBridge logo"
-            className="size-8 object-contain"
+            className="size-7 sm:size-8 object-contain"
           />
           <div>
-            <span className="font-bold text-bb-text tracking-tight">
+            <span className="font-bold text-bb-text tracking-tight text-sm sm:text-base">
               Blood<span className="text-bb-crimson-bright">Bridge</span>
             </span>
-            <span className="ml-2 rounded-md bg-bb-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bb-teal">
-              Blood Bank Hub
+            <span className="ml-1.5 sm:ml-2 rounded-md bg-bb-teal/10 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-bb-teal">
+              Blood Bank
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <NotificationCenter />
           <button
             type="button"
             onClick={() => setShowEditor(true)}
-            className="rounded-xl bg-bb-crimson px-3.5 py-2 text-xs font-bold text-white hover:bg-bb-crimson-bright shadow-sm transition"
+            className="rounded-xl bg-bb-crimson px-2.5 sm:px-3.5 py-2 text-xs font-bold text-white hover:bg-bb-crimson-bright shadow-sm transition min-h-[40px] flex items-center gap-1 active:scale-[0.98]"
           >
-            Manage Inventory
+            <span>🩸</span>
+            <span className="hidden sm:inline">Manage Inventory</span>
+            <span className="sm:hidden">Inventory</span>
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-xl border border-bb-border px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition"
+            className="rounded-xl border border-bb-border px-2.5 sm:px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition min-h-[40px] flex items-center justify-center"
           >
             Logout
           </button>

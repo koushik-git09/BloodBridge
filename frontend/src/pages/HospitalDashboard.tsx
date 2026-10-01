@@ -25,6 +25,10 @@ import {
   enableNotifications,
   getBrowserNotificationPermission,
 } from "../services/notificationService";
+import {
+  subscribeBloodBridgeEvent,
+  emitBloodBridgeEvent,
+} from "../utils/events";
 
 
 function mapApiRequestToBloodRequest(
@@ -199,6 +203,7 @@ export default function HospitalDashboard() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [selectedReq, setSelectedReq] = useState<BloodRequest | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "details">("list");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -248,6 +253,39 @@ export default function HospitalDashboard() {
 
   useEffect(() => {
     loadRequests();
+
+    // Subscribe to real-time events targeting hospital or all
+    const unsubscribe = subscribeBloodBridgeEvent("bloodbridge:request-updated", (detail) => {
+      if (!detail.target || detail.target === "hospital" || detail.target === "all") {
+        loadRequests();
+      }
+    });
+
+    const unsubscribeRefresh = subscribeBloodBridgeEvent("bloodbridge:refresh-all", () => {
+      loadRequests();
+    });
+
+    // Revalidate when browser tab becomes active again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadRequests();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Active gentle polling while tab is open
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadRequests();
+      }
+    }, 25000);
+
+    return () => {
+      unsubscribe();
+      unsubscribeRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [loadRequests]);
 
   useEffect(() => {
@@ -284,6 +322,14 @@ export default function HospitalDashboard() {
 
     const mappedNew = mapApiRequestToBloodRequest(newReq);
     setSelectedReq(mappedNew);
+    setMobileView("details");
+
+    // Broadcast update so donor and blood bank portals sync immediately
+    emitBloodBridgeEvent("bloodbridge:request-updated", {
+      target: "all",
+      requestId: newReq.id,
+      source: "hospital_create",
+    });
   };
 
   const handleConfirmDonation = async (requestId: string, donorRequestId: string) => {
@@ -292,6 +338,13 @@ export default function HospitalDashboard() {
       await confirmDonorDonation(requestId, donorRequestId);
       showToast("Donation confirmed! Donor record and inventory updated.");
       await loadRequests();
+
+      // Broadcast update so donor portal syncs immediately
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        requestId,
+        source: "hospital_confirm",
+      });
     } catch (err) {
       console.error("Failed to confirm donation:", err);
       showToast(err instanceof Error ? err.message : "Failed to confirm donation");
@@ -316,7 +369,6 @@ export default function HospitalDashboard() {
         </div>
       )}
 
-
       {/* Create Request Flow Modal */}
       {showCreate && (
         <CreateRequestFlow
@@ -326,45 +378,50 @@ export default function HospitalDashboard() {
       )}
 
       {/* Top Navbar */}
-      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-3 sm:px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <img
             src="/bloodbridge-logo.png"
             alt="BloodBridge logo"
-            className="size-8 object-contain"
+            className="size-7 sm:size-8 object-contain"
           />
           <div>
-            <span className="font-bold text-bb-text tracking-tight">
+            <span className="font-bold text-bb-text tracking-tight text-sm sm:text-base">
               Blood<span className="text-bb-crimson-bright">Bridge</span>
             </span>
-            <span className="ml-2 rounded-md bg-bb-blue/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bb-blue">
-              Hospital Portal
+            <span className="ml-1.5 sm:ml-2 rounded-md bg-bb-blue/10 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-bb-blue">
+              Hospital
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <NotificationCenter
             onSelectNotification={(notif) => {
               const reqId = notif.data?.request_id;
               if (reqId) {
                 const found = requests.find((r) => r.id === reqId);
-                if (found) setSelectedReq(found);
+                if (found) {
+                  setSelectedReq(found);
+                  setMobileView("details");
+                }
               }
             }}
           />
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="rounded-xl bg-bb-crimson px-3.5 py-2 text-xs font-bold text-white hover:bg-bb-crimson-bright shadow-sm transition"
+            className="rounded-xl bg-bb-crimson px-2.5 sm:px-3.5 py-2 text-xs font-bold text-white hover:bg-bb-crimson-bright shadow-sm transition min-h-[40px] flex items-center gap-1 active:scale-[0.98]"
           >
-            + Create Request
+            <span>+</span>
+            <span className="hidden sm:inline">Create Request</span>
+            <span className="sm:hidden">Request</span>
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-xl border border-bb-border px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition"
+            className="rounded-xl border border-bb-border px-2.5 sm:px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition min-h-[40px] flex items-center justify-center"
           >
             Logout
           </button>
@@ -372,7 +429,7 @@ export default function HospitalDashboard() {
       </nav>
 
       {/* Dashboard Body */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Header Greeting */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -414,20 +471,61 @@ export default function HospitalDashboard() {
         {/* Statistics Metric Cards */}
         <HospitalStats requests={requests} />
 
+        {/* Mobile View Switcher (phones/tablets < 1024px) */}
+        <div className="lg:hidden flex items-center justify-between bg-white/80 p-1.5 rounded-2xl border border-bb-border shadow-xs backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setMobileView("list")}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+              mobileView === "list"
+                ? "bg-bb-crimson text-white shadow-xs"
+                : "text-bb-muted hover:text-bb-text"
+            }`}
+          >
+            📋 Requests ({requests.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileView("details")}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+              mobileView === "details"
+                ? "bg-bb-crimson text-white shadow-xs"
+                : "text-bb-muted hover:text-bb-text"
+            }`}
+          >
+            🔍 Details {selectedReq ? `(#${selectedReq.id.slice(-4)})` : ""}
+          </button>
+        </div>
+
         {/* 2-Column Command Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Requests List */}
-          <div className="lg:col-span-4">
+          <div className={`lg:col-span-4 ${mobileView === "details" ? "hidden lg:block" : "block"}`}>
             <HospitalRequestList
               requests={requests}
               selectedId={selectedReq?.id ?? null}
-              onSelect={(r) => setSelectedReq(r)}
+              onSelect={(r) => {
+                setSelectedReq(r);
+                setMobileView("details");
+              }}
               onCreateClick={() => setShowCreate(true)}
             />
           </div>
 
           {/* Right Column: Selected Request Details */}
-          <div className="lg:col-span-8">
+          <div className={`lg:col-span-8 ${mobileView === "list" ? "hidden lg:block" : "block"}`}>
+            {mobileView === "details" && (
+              <div className="lg:hidden mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileView("list")}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-bb-crimson hover:underline p-1"
+                >
+                  <span>←</span>
+                  <span>Back to Request List</span>
+                </button>
+              </div>
+            )}
             <HospitalRequestDetails
               request={selectedReq}
               onConfirmDonation={handleConfirmDonation}

@@ -116,12 +116,105 @@ if (messaging) {
   });
 }
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+const STATIC_CACHE_NAME = "bloodbridge-shell-v1";
+const STATIC_PRECACHE_URLS = [
+  "/",
+  "/index.html",
+  "/manifest.json",
+  "/bloodbridge-icon-192.png",
+  "/bloodbridge-icon-512.png",
+  "/bloodbridge-icon-maskable.png",
+  "/bloodbridge-logo.png",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(STATIC_CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_PRECACHE_URLS).catch(() => {}))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== STATIC_CACHE_NAME)
+            .map((k) => caches.delete(k))
+        )
+      )
+      .then(() => self.clients.claim())
+  );
+});
+
+// Secure fetch handler: NEVER cache /api/ calls or sensitive endpoints
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 1. Only handle GET requests; pass through POST/PUT/PATCH/DELETE
+  if (req.method !== "GET") {
+    return;
+  }
+
+  // 2. Strictly bypass cache for API routes, auth, websockets, and Firebase SDK calls
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/health") ||
+    url.hostname.includes("googleapis.com") ||
+    url.hostname.includes("firebase") ||
+    url.hostname.includes("identitytoolkit")
+  ) {
+    return;
+  }
+
+  // 3. Navigation requests: Network-first, fallback to cached index.html
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).catch(() => caches.match("/index.html").then((res) => res || caches.match("/")))
+    );
+    return;
+  }
+
+  // 4. Static assets (JS, CSS, images, fonts, manifest)
+  const isStaticAsset =
+    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|webp|ico|woff2?|json)$/) ||
+    url.origin === self.location.origin;
+
+  if (isStaticAsset) {
+    event.respondWith(
+      caches.match(req).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Fetch updated version in background for next time (stale-while-revalidate)
+          fetch(req)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(req, networkResponse));
+              }
+            })
+            .catch(() => {});
+          return cachedResponse;
+        }
+
+        return fetch(req)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const resClone = networkResponse.clone();
+              caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(req, resClone));
+            }
+            return networkResponse;
+          })
+          .catch(() => {
+            // If offline and request is an image, fallback gracefully
+            return caches.match("/bloodbridge-logo.png");
+          });
+      })
+    );
+  }
 });
 
 // Native push listener for robust background wake-up and deduplicated notification delivery

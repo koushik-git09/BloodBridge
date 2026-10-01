@@ -20,7 +20,7 @@ export default function Header({ title }: HeaderProps) {
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text.left text-bb-text transition hover:opacity-80"
+          className="flex items-center gap-2 text-left text-bb-text transition hover:opacity-80 min-h-[40px]"
         >
           <img
             src="/bloodbridge-logo.png"
@@ -40,16 +40,16 @@ export default function Header({ title }: HeaderProps) {
         </button>
 
         {user && (
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-bold text-bb-text">{user.name}</p>
-              <p className="text-xs font-medium text-bb-muted uppercase tracking-wider">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="text-right">
+              <p className="text-xs sm:text-sm font-bold text-bb-text truncate max-w-[120px] sm:max-w-none">{user.name}</p>
+              <p className="text-[10px] sm:text-xs font-medium text-bb-muted uppercase tracking-wider">
                 {user.role}
               </p>
             </div>
             <button
               onClick={handleLogout}
-              className="rounded-xl border border-bb-border bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-bb-text transition hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+              className="rounded-xl border border-bb-border bg-white/80 px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-bb-text transition hover:bg-red-50 hover:text-red-600 hover:border-red-200 min-h-[38px] flex items-center justify-center"
             >
               Sign out
             </button>

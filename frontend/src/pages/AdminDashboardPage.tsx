@@ -7,6 +7,7 @@ import {
 } from "../services/adminService";
 import { logout } from "../services/authService";
 import type { HospitalRegistration } from "../types";
+import { emitBloodBridgeEvent } from "../utils/events";
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -39,6 +40,24 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     fetchRegistrations();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchRegistrations();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchRegistrations();
+      }
+    }, 30000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [filter]);
 
   const handleLogout = () => {
@@ -57,6 +76,11 @@ export default function AdminDashboardPage() {
         setSelectedHospital(null);
       }
       await fetchRegistrations();
+
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "admin_approve_hospital",
+      });
     } catch (err) {
       setError(
         err instanceof Error
@@ -79,6 +103,11 @@ export default function AdminDashboardPage() {
         setSelectedHospital(null);
       }
       await fetchRegistrations();
+
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "admin_reject_hospital",
+      });
     } catch (err) {
       setError(
         err instanceof Error
