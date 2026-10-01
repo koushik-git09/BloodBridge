@@ -108,12 +108,12 @@ export default function DonorRequestsList({
 
             {/* Response CTA */}
             {isPending && (
-              <div className="mt-5 flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-bb-border/60">
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-bb-border/60">
                 <button
                   type="button"
                   disabled={isLoading}
                   onClick={() => onDecline(request.id)}
-                  className="rounded-xl border border-bb-border px-4 py-2 text-xs font-semibold text-bb-muted hover:bg-slate-50 transition active:scale-98 disabled:opacity-50"
+                  className="flex-1 sm:flex-initial rounded-xl border border-bb-border px-4 py-2 text-xs font-semibold text-bb-muted hover:bg-slate-50 transition active:scale-98 disabled:opacity-50 min-h-[40px] flex items-center justify-center"
                 >
                   Decline
                 </button>
@@ -121,7 +121,7 @@ export default function DonorRequestsList({
                   type="button"
                   disabled={isLoading}
                   onClick={() => onAccept(request.id)}
-                  className="rounded-xl bg-bb-crimson px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition active:scale-98 disabled:opacity-50 inline-flex items-center gap-2"
+                  className="w-full sm:w-auto rounded-xl bg-bb-crimson px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-bb-crimson-bright transition active:scale-98 disabled:opacity-50 min-h-[40px] flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>

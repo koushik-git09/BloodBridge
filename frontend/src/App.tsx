@@ -16,10 +16,17 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 
+import { AuthProvider } from "./context/AuthContext";
+import InstallPrompt from "./components/common/InstallPrompt";
+import OfflineBanner from "./components/common/OfflineBanner";
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AuthProvider>
+        <OfflineBanner />
+        <InstallPrompt />
+        <Routes>
 
         {/* ================= PUBLIC ROUTES ================= */}
 
@@ -133,6 +140,7 @@ export default function App() {
         />
 
       </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

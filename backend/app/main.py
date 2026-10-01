@@ -1,3 +1,5 @@
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.blood_requests import router as blood_request_router
@@ -13,9 +15,50 @@ from app.routers.admin import router as admin_router
 from app.routers.notifications import router as notifications_router
 from app.core.config import FRONTEND_URL, CORS_ORIGINS
 
+logger = logging.getLogger("bloodbridge")
+
+
+async def init_db_indexes():
+    """Ensure essential query indexes exist in MongoDB without recreating existing ones."""
+    try:
+        # Users collection
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("role")
+
+        # Blood Requests collection
+        await db.blood_requests.create_index([("hospital_id", 1), ("created_at", -1)])
+        await db.blood_requests.create_index("status")
+
+        # Donor Requests collection
+        await db.donor_requests.create_index([("donor_id", 1), ("status", 1)])
+        await db.donor_requests.create_index("request_id")
+
+        # Blood Bank Reservations collection
+        await db.blood_bank_reservations.create_index([("blood_bank_id", 1), ("status", 1)])
+        await db.blood_bank_reservations.create_index("request_id")
+
+        # Notifications collection
+        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+
+        # Password Reset Tokens (TTL index on expires_at for automatic cleanup)
+        await db.password_reset_tokens.create_index("token_hash", unique=True)
+        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+
+        logger.info("[DB] MongoDB production indexes initialized successfully.")
+    except Exception as e:
+        logger.warning(f"[DB] Index initialization note: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db_indexes()
+    yield
+
+
 app = FastAPI(
     title="BloodBridge API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Build allowed origins list for CORS

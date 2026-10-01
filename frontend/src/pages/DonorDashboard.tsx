@@ -21,6 +21,10 @@ import {
   enableNotifications,
   getBrowserNotificationPermission,
 } from "../services/notificationService";
+import {
+  subscribeBloodBridgeEvent,
+  emitBloodBridgeEvent,
+} from "../utils/events";
 
 
 type Tab = "overview" | "history" | "requirements";
@@ -91,6 +95,39 @@ export default function DonorDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+
+    // Subscribe to real-time events targeting donor or all
+    const unsubscribe = subscribeBloodBridgeEvent("bloodbridge:request-updated", (detail) => {
+      if (!detail.target || detail.target === "donor" || detail.target === "all") {
+        loadDashboardData();
+      }
+    });
+
+    const unsubscribeRefresh = subscribeBloodBridgeEvent("bloodbridge:refresh-all", () => {
+      loadDashboardData();
+    });
+
+    // Revalidate when browser tab becomes active again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadDashboardData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Active gentle polling while tab is open
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadDashboardData();
+      }
+    }, 25000);
+
+    return () => {
+      unsubscribe();
+      unsubscribeRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [loadDashboardData]);
 
   const handleAvailabilityUpdate = async (newAvail: DonorAvailability) => {
@@ -103,6 +140,11 @@ export default function DonorDashboard() {
       setAvailability(newAvail);
       setUser((prev) => (prev ? { ...prev, availability: newAvail } : null));
       showToast(`Availability updated to ${newAvail.toLowerCase()}`);
+
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "donor_availability",
+      });
     } catch (err) {
       console.error("Failed to update availability:", err);
       showToast(err instanceof Error ? err.message : "Failed to update availability");
@@ -116,8 +158,13 @@ export default function DonorDashboard() {
       setActionLoadingId(donorRequestId);
       await respondToDonorRequest(donorRequestId, "ACCEPT");
       showToast("Request accepted! Hospital has been notified.");
-      // Refresh requests and profile
       await loadDashboardData();
+
+      // Broadcast update so hospital dashboard syncs immediately
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "donor_accept",
+      });
     } catch (err) {
       console.error("Failed to accept request:", err);
       showToast(err instanceof Error ? err.message : "Failed to accept request");
@@ -132,6 +179,11 @@ export default function DonorDashboard() {
       await respondToDonorRequest(donorRequestId, "DECLINE");
       showToast("Request declined.");
       await loadDashboardData();
+
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target: "all",
+        source: "donor_decline",
+      });
     } catch (err) {
       console.error("Failed to decline request:", err);
       showToast(err instanceof Error ? err.message : "Failed to decline request");
@@ -150,7 +202,6 @@ export default function DonorDashboard() {
     (r) => r.status === "PENDING" || r.status === "ACCEPTED"
   );
 
-
   return (
     <div className="min-h-screen bb-network-bg text-bb-text">
       {/* Toast */}
@@ -161,24 +212,24 @@ export default function DonorDashboard() {
       )}
 
       {/* Navigation */}
-      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <nav className="glass sticky top-0 z-40 border-b border-bb-border px-3 sm:px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <img
             src="/bloodbridge-logo.png"
             alt="BloodBridge logo"
-            className="size-8 object-contain"
+            className="size-7 sm:size-8 object-contain"
           />
           <div>
-            <span className="font-bold text-bb-text tracking-tight">
+            <span className="font-bold text-bb-text tracking-tight text-sm sm:text-base">
               Blood<span className="text-bb-crimson-bright">Bridge</span>
             </span>
-            <span className="ml-2 rounded-md bg-bb-crimson/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bb-crimson">
-              Donor Portal
+            <span className="ml-1.5 sm:ml-2 rounded-md bg-bb-crimson/10 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-bb-crimson">
+              Donor
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <NotificationCenter onSelectNotification={() => setTab("overview")} />
           <AvailabilitySelector
             availability={availability}
@@ -189,7 +240,7 @@ export default function DonorDashboard() {
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-xl border border-bb-border px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition"
+            className="rounded-xl border border-bb-border px-2.5 sm:px-3.5 py-2 text-xs font-semibold text-bb-muted hover:bg-white hover:text-bb-text transition min-h-[40px] flex items-center justify-center"
           >
             Logout
           </button>

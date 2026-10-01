@@ -23,6 +23,7 @@ def serialize_user(user: dict) -> dict:
 
     user.pop("_id", None)
     user.pop("passwordHash", None)
+    user.pop("fcm_tokens", None)
 
     return user
 

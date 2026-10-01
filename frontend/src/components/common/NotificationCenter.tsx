@@ -8,6 +8,10 @@ import {
   getBrowserNotificationPermission,
 } from "../../services/notificationService";
 import { onForegroundMessage } from "../../services/firebase";
+import {
+  emitBloodBridgeEvent,
+  subscribeBloodBridgeEvent,
+} from "../../utils/events";
 
 interface NotificationCenterProps {
   onSelectNotification?: (notif: Notification) => void;
@@ -40,19 +44,44 @@ export default function NotificationCenter({
     fetchList();
 
     // Listen for foreground FCM push events
-    const unsub = onForegroundMessage((payload) => {
+    const unsubFCM = onForegroundMessage((payload) => {
       fetchList();
       if (payload.notification?.title) {
         setFeedbackMessage(`🔔 ${payload.notification.title}`);
         setTimeout(() => setFeedbackMessage(null), 5000);
       }
+
+      // Route targeted real-time refresh to the active dashboard
+      const data = (payload.data || {}) as Record<string, string>;
+      const type = (data.type || data.notification_type || "").toUpperCase();
+      let target: "hospital" | "donor" | "blood-bank" | "all" = "all";
+
+      if (type.includes("DONOR") || type === "EMERGENCY_BLOOD_REQUEST") {
+        target = type === "DONOR_ACCEPTED" ? "hospital" : "donor";
+      } else if (type.includes("BLOOD_BANK") || type === "RESERVATION_ALERT") {
+        target = type === "BLOOD_BANK_RESPONSE" ? "hospital" : "blood-bank";
+      } else if (type.includes("HOSPITAL")) {
+        target = "hospital";
+      }
+
+      emitBloodBridgeEvent("bloodbridge:request-updated", {
+        target,
+        requestId: data.request_id,
+        source: "fcm",
+        payload: data,
+      });
+    });
+
+    const unsubRefresh = subscribeBloodBridgeEvent("bloodbridge:notification-received", () => {
+      fetchList();
     });
 
     // Gentle polling for fresh alerts
-    const interval = setInterval(fetchList, 15000);
+    const interval = setInterval(fetchList, 20000);
 
     return () => {
-      if (unsub) unsub();
+      if (unsubFCM) unsubFCM();
+      unsubRefresh();
       clearInterval(interval);
     };
   }, [fetchList]);
