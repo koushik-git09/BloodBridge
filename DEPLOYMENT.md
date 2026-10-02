@@ -28,19 +28,6 @@ Before starting, make sure you have:
 
 This is the recommended, most reliable, and 100% free-tier-compatible setup.
 
-```
-+--------------------------+          HTTPS           +--------------------------+
-|      Vercel Frontend     | -----------------------> |      Render Backend      |
-|  (React Vite Static SPA) |                          |       (FastAPI API)      |
-+--------------------------+                          +--------------------------+
-                                                                    |
-                                                                    | Async Driver (Motor)
-                                                                    v
-                                                      +--------------------------+
-                                                      |   MongoDB Atlas Cloud    |
-                                                      +--------------------------+
-```
-
 ---
 
 ### Step 1: Prepare MongoDB Atlas (Cloud Database)
