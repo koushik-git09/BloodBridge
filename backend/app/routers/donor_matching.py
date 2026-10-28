@@ -24,16 +24,16 @@ router = APIRouter(
 async def get_matching_donors(
     request_id: str,
     current_user=Depends(
-        require_role("HOSPITAL")
+        require_role("HOSPITAL", "BLOOD_BANK")
     ),
 ):
     """
-    Temporary testing endpoint.
-
-    Finds compatible donors for a hospital request.
+    Finds compatible donors for a hospital blood request.
+    Accessible to the owning hospital or to blood banks holding a reservation for this request.
     """
 
     from bson import ObjectId
+    from fastapi import HTTPException
 
     try:
         request = await db.blood_requests.find_one({
@@ -52,21 +52,25 @@ async def get_matching_donors(
     # Security check
     # -----------------------------------------------------
 
-    if request["hospital_id"] != current_user["id"]:
-        from fastapi import HTTPException
-
+    if current_user["role"] == "HOSPITAL" and request["hospital_id"] != current_user["id"]:
         raise HTTPException(
             status_code=403,
-            detail=(
-                "You do not have permission "
-                "to access this request"
-            ),
+            detail="You do not have permission to access this request",
         )
 
+    if current_user["role"] == "BLOOD_BANK":
+        reservation = await db.blood_bank_reservations.find_one({
+            "request_id": request_id,
+            "blood_bank_id": current_user["id"],
+        })
+        if not reservation:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to access this request",
+            )
+
     hospital = await db.users.find_one({
-        "_id": ObjectId(
-            current_user["id"]
-        ),
+        "_id": ObjectId(request["hospital_id"]),
         "role": "HOSPITAL",
     })
 
@@ -76,9 +80,7 @@ async def get_matching_donors(
             "donors": [],
         }
 
-    location = hospital.get(
-        "location"
-    )
+    location = hospital.get("location")
 
     if not location:
         return {

@@ -175,8 +175,6 @@ async def serialize_request(
                 "responded_at": to_utc(match.get("responded_at")),
             })
 
-
-
     # Query linked blood bank reservations for this request so the hospital can view them
     blood_bank_matches = []
     resv_cursor = db.blood_bank_reservations.find(
@@ -442,14 +440,13 @@ async def get_hospital_requests(
 async def confirm_donation(
     request_id: str,
     donor_request_id: str,
-    hospital_id: str,
+    hospital_id: str | None = None,
+    current_user: dict | None = None,
 ):
     """
-    Confirm that a donor has actually donated blood.
-
-    This is the point where the donation becomes real in
-    the system. Simply accepting a donor request does not
-    count as a donation.
+    Confirm that an accepted donor has completed the blood donation.
+    Can be confirmed by the owning hospital or by an authorized blood bank
+    that holds a reservation for this blood request.
     """
 
     # -----------------------------------------------------
@@ -469,10 +466,30 @@ async def confirm_donation(
         return None, "REQUEST_NOT_FOUND"
 
     # -----------------------------------------------------
-    # Security check
+    # Security check: Hospital or Blood Bank authorization
     # -----------------------------------------------------
 
-    if blood_request["hospital_id"] != hospital_id:
+    if current_user:
+        user_role = current_user.get("role")
+        user_id = current_user.get("id")
+
+        if user_role == "HOSPITAL":
+            if blood_request["hospital_id"] != user_id:
+                return None, "FORBIDDEN"
+        elif user_role == "BLOOD_BANK":
+            # Blood bank must have a reservation for this request
+            reservation = await db.blood_bank_reservations.find_one({
+                "request_id": request_id,
+                "blood_bank_id": user_id,
+            })
+            if not reservation:
+                return None, "FORBIDDEN"
+        else:
+            return None, "FORBIDDEN"
+    elif hospital_id:
+        if blood_request["hospital_id"] != hospital_id:
+            return None, "FORBIDDEN"
+    else:
         return None, "FORBIDDEN"
 
     # -----------------------------------------------------
@@ -510,11 +527,15 @@ async def confirm_donation(
         return None, "FORBIDDEN"
 
     # -----------------------------------------------------
-    # Make sure donor request belongs to this hospital
+    # For hospital users, verify hospital ownership
     # -----------------------------------------------------
 
-    if donor_request.get("hospital_id") != hospital_id:
-        return None, "FORBIDDEN"
+    if current_user and current_user.get("role") == "HOSPITAL":
+        if donor_request.get("hospital_id") != current_user.get("id"):
+            return None, "FORBIDDEN"
+    elif hospital_id and not current_user:
+        if donor_request.get("hospital_id") != hospital_id:
+            return None, "FORBIDDEN"
 
     # -----------------------------------------------------
     # Only ACCEPTED donors can be marked as donated
@@ -550,18 +571,24 @@ async def confirm_donation(
     if confirmation.modified_count != 1:
         return None, "INVALID_STATUS"
 
-    # ACCEPTED means the donor agreed.  A completed-donation record is only
-    # created after the hospital explicitly confirms the donation.
-    await db.donations.insert_one({
+    # Completed-donation record is only created after confirmation
+    donation_doc = {
         "donor_id": donor_id,
         "request_id": request_id,
-        "hospital_id": hospital_id,
+        "hospital_id": blood_request["hospital_id"],
         "blood_group": donor_request["blood_group"],
         "units": 1,
         "donated_at": now,
         "status": "COMPLETED",
         "donor_request_id": donor_request_id,
-    })
+    }
+    if current_user:
+        donation_doc["confirmed_by_role"] = current_user.get("role")
+        donation_doc["confirmed_by_id"] = current_user.get("id")
+        if current_user.get("role") == "BLOOD_BANK":
+            donation_doc["blood_bank_id"] = current_user.get("id")
+
+    await db.donations.insert_one(donation_doc)
 
     # -----------------------------------------------------
     # Update donor statistics
@@ -603,6 +630,28 @@ async def confirm_donation(
         )
     except Exception as e:
         logger.warning(f"Failed to send donation completion notification: {e}")
+
+    # If confirmed by blood bank, notify hospital
+    if current_user and current_user.get("role") == "BLOOD_BANK":
+        try:
+            bb_name = current_user.get("name", "Blood Bank")
+            await send_notification_to_user(
+                user_id=blood_request["hospital_id"],
+                title="🩸 Donation Confirmed",
+                message=f"{bb_name} confirmed blood donation for your request.",
+                notification_type="DONATION_CONFIRMED",
+                data={
+                    "type": "DONATION_CONFIRMED",
+                    "request_id": request_id,
+                    "donor_request_id": donor_request_id,
+                    "blood_group": donor_request.get("blood_group", ""),
+                    "notification_type": "DONATION_CONFIRMED",
+                },
+                urgency="NORMAL",
+                dedup_key=f"bb_donation_confirmed:{request_id}:{donor_request_id}",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send confirmation notification to hospital: {e}")
 
     # -----------------------------------------------------
     # Add one donated unit to blood request

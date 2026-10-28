@@ -15,6 +15,7 @@ import InventoryMatrix from "../components/InventoryMatrix";
 import BloodBankStats from "../components/bloodbank/BloodBankStats";
 import BloodBankReservationList from "../components/bloodbank/BloodBankReservationList";
 import BloodBankInventoryEditor from "../components/bloodbank/BloodBankInventoryEditor";
+import BloodBankDonorModal from "../components/bloodbank/BloodBankDonorModal";
 import NotificationCenter from "../components/common/NotificationCenter";
 import {
   enableNotifications,
@@ -43,6 +44,7 @@ export default function BloodBankDashboard() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [inventory, setInventory] = useState<Record<BloodGroup, number>>(EMPTY_INVENTORY);
   const [reservations, setReservations] = useState<BloodBankReservationResponse[]>([]);
+  const [selectedResForDonors, setSelectedResForDonors] = useState<BloodBankReservationResponse | null>(null);
 
   const [highlightGroup, setHighlightGroup] = useState<BloodGroup | undefined>();
   const [showEditor, setShowEditor] = useState(false);
@@ -211,6 +213,17 @@ export default function BloodBankDashboard() {
         inventory={inventory}
         onSave={handleSaveInventory}
         saving={savingInventory}
+      />
+
+      {/* Eligible Donors and Request Details Modal */}
+      <BloodBankDonorModal
+        isOpen={!!selectedResForDonors}
+        onClose={() => setSelectedResForDonors(null)}
+        reservation={selectedResForDonors}
+        onDonationConfirmed={() => {
+          loadDashboard();
+          showToast("Donation confirmed successfully! Request updated.");
+        }}
       />
 
       {/* Top Navbar */}
@@ -385,6 +398,7 @@ export default function BloodBankDashboard() {
           inventory={inventory}
           onRespond={handleRespondReservation}
           responding={responding}
+          onViewDonors={(res) => setSelectedResForDonors(res)}
         />
       </main>
     </div>
