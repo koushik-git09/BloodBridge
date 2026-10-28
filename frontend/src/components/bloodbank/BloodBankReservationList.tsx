@@ -13,6 +13,7 @@ interface BloodBankReservationListProps {
     unitsConfirmed: number
   ) => Promise<void>;
   responding: boolean;
+  onViewDonors?: (reservation: BloodBankReservationResponse) => void;
 }
 
 export default function BloodBankReservationList({
@@ -20,6 +21,7 @@ export default function BloodBankReservationList({
   inventory,
   onRespond,
   responding,
+  onViewDonors,
 }: BloodBankReservationListProps) {
   const [selectedRes, setSelectedRes] = useState<BloodBankReservationResponse | null>(null);
   const [action, setAction] = useState<ReservationAction | null>(null);
@@ -307,6 +309,16 @@ export default function BloodBankReservationList({
                       </div>
                     )}
                     <div className="mt-4 flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-bb-border/60">
+                      {onViewDonors && (
+                        <button
+                          type="button"
+                          onClick={() => onViewDonors(res)}
+                          className="flex-1 sm:flex-initial rounded-xl border border-bb-border bg-white px-3.5 py-2 text-xs font-semibold text-bb-text hover:bg-slate-50 transition min-h-[38px] flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                        >
+                          <span>👥</span>
+                          <span>Eligible Donors</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={responding}
@@ -335,6 +347,19 @@ export default function BloodBankReservationList({
                       </button>
                     </div>
                   </>
+                )}
+
+                {!isPending && onViewDonors && (
+                  <div className="mt-3.5 flex items-center justify-end pt-2.5 border-t border-bb-border/50">
+                    <button
+                      type="button"
+                      onClick={() => onViewDonors(res)}
+                      className="rounded-xl border border-bb-border bg-white px-3.5 py-1.5 text-xs font-semibold text-bb-text hover:bg-slate-100 transition flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
+                    >
+                      <span>👥</span>
+                      <span>View Request & Eligible Donors</span>
+                    </button>
+                  </div>
                 )}
               </div>
             );

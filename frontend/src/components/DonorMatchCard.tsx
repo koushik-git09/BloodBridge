@@ -6,7 +6,7 @@ interface Props {
   donor: Donor;
   onConfirmDonation?: () => void;
   isConfirmingDonation?: boolean;
-  viewMode?: 'hospital' | 'donor';
+  viewMode?: 'hospital' | 'donor' | 'blood_bank';
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
@@ -68,7 +68,7 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
                     <span className="truncate">{donor.address}</span>
                   </span>
                 )}
-                {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
+                {(viewMode === 'hospital' || viewMode === 'blood_bank') && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
                   <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                     📱 {donor.phone}
                   </span>
@@ -115,7 +115,7 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
 
 
           {/* Donor Mobile Contact Section (Visible ONLY after Donor accepts) */}
-          {viewMode === 'hospital' && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
+          {(viewMode === 'hospital' || viewMode === 'blood_bank') && (donor.status === 'ACCEPTED' || donor.status === 'DONATED') && donor.phone && (
             <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 p-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
@@ -136,7 +136,7 @@ export default function DonorMatchCard({ donor, onConfirmDonation, isConfirmingD
             </div>
           )}
 
-          {viewMode === 'hospital' && donor.status === 'ACCEPTED' && onConfirmDonation && (
+          {(viewMode === 'hospital' || viewMode === 'blood_bank') && donor.status === 'ACCEPTED' && onConfirmDonation && (
             <div className="pt-1">
               <button
                 type="button"

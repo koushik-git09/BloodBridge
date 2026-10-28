@@ -54,9 +54,8 @@ async def get_my_requests(
 )
 async def get_request(
     request_id: str,
-    current_user=Depends(require_role("HOSPITAL")),
+    current_user=Depends(require_role("HOSPITAL", "BLOOD_BANK")),
 ):
-
     request = await get_request_by_id(request_id)
 
     if not request:
@@ -66,13 +65,28 @@ async def get_request(
         )
 
     # Hospital can only view its own request
-    if request["hospital_id"] != current_user["id"]:
+    if current_user["role"] == "HOSPITAL" and request["hospital_id"] != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access this request",
         )
 
+    # Blood bank can only view a request if it has a reservation for it
+    if current_user["role"] == "BLOOD_BANK":
+        from app.database.mongodb import db
+        reservation = await db.blood_bank_reservations.find_one({
+            "request_id": request_id,
+            "blood_bank_id": current_user["id"],
+        })
+        if not reservation:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this request",
+            )
+
     return request
+
+
 @router.patch(
     "/{request_id}/donors/{donor_request_id}/confirm-donation",
     response_model=BloodRequestResponse,
@@ -81,18 +95,18 @@ async def confirm_donation(
     request_id: str,
     donor_request_id: str,
     current_user=Depends(
-        require_role("HOSPITAL")
+        require_role("HOSPITAL", "BLOOD_BANK")
     ),
 ):
     """
-    Hospital confirms that an accepted donor has
+    Hospital or authorized Blood Bank confirms that an accepted donor has
     completed the blood donation.
     """
 
     donation, error = await confirm_donation_service(
         donor_request_id=donor_request_id,
         request_id=request_id,
-        hospital_id=current_user["id"],
+        current_user=current_user,
     )
 
     if error == "NOT_FOUND":
@@ -126,6 +140,12 @@ async def confirm_donation(
         raise HTTPException(
             status_code=404,
             detail="Blood request not found",
+        )
+
+    if error == "REQUEST_FULFILLED":
+        raise HTTPException(
+            status_code=400,
+            detail="This blood request is already fulfilled",
         )
 
     return donation
